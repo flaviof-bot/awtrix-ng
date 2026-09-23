@@ -76,6 +76,7 @@ struct FakeIcon : IPageIcon {
       for (int x = 0; x < w; ++x) dst.setPixel(x + xOffset, y + yOffset, color);
   }
   int width() const override { return w; }
+  int height() const override { return 8; }
   std::unique_ptr<IPageIcon> create() const override {
     if (!factoryOk || clears < factoryMinClears) return nullptr;
     auto child = std::make_unique<FakeIcon>();
