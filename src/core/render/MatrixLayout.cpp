@@ -61,7 +61,7 @@ MatrixLayout sanitizeMatrixLayout(MatrixLayout in, bool* changed) {
     out.panelColorOrder = PanelColorOrder::Grb;
 
   // A width/panel-count pair that lands outside the supported range is unusable, so fall back to
-  // the stock layout and keep only the orientation flags the user set.
+  // the stock width and wiring, keeping the sanitized height and display orientation.
   if (out.width() < kMatrixWidthMin || out.width() > kMatrixWidthMax) {
     MatrixLayout fallback;
     fallback.panelHeight = out.panelHeight;
