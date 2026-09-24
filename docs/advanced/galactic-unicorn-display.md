@@ -151,6 +151,14 @@ seconds after the last frame. Universes start at zero and hold 170 RGB pixels
 each, continuing across the 53x11 canvas. The frame buffer is allocated on first
 use. HTTP discovery advertises the future F6 server; it does not implement HTTP.
 
+F5b size comparison (Pico W, same compiler/options, 512 KiB LittleFS): UDP
+enabled uses **100,784 bytes static RAM / 538,876 bytes flash**. The non-release
+`galactic_unicorn_udp_measure` build omits both services and uses **100,644 /
+536,908 bytes**: enabling them costs **140 bytes static RAM / 1,968 bytes flash**.
+An active 53x11 Art-Net frame additionally needs 2,332 heap bytes for its pixels,
+plus WiFiUDP/lwIP packet allocations. Both services fit comfortably; neither is
+reported as unavailable. The measurement environment is not a release target.
+
 Hardware acceptance: flash the UF2, check the SSID/AP MODE behavior above,
 capture display and CYW43 PIO/SM logs plus `refresh advancing`, then check the
 animated boot screen during a stored-credential join. Host tests and firmware

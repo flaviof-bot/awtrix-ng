@@ -45,6 +45,13 @@ static void artnet_frame_and_timeout() {
   TEST_ASSERT_EQUAL_INT(6454, WiFiUDP::listen);
   WiFiUDP::incoming = {'A','r','t','-','N','e','t',0, 0,0x50, 0,14, 0,0, 0,0, 0,3, 255,0,0};
   TEST_ASSERT_TRUE(a.tick(c, 100));
+  TEST_ASSERT_EQUAL_HEX32(0xFF0000, c.getPixel(0, 0));
+  TEST_ASSERT_EQUAL_HEX32(0, c.getPixel(1, 0));
+  WiFiUDP::incoming[14] = 1; // universe one starts at pixel 170, not 512
+  WiFiUDP::incoming[18] = 0; WiFiUDP::incoming[19] = 255;
+  WiFiUDP::consumed = false;
+  TEST_ASSERT_TRUE(a.tick(c, 100));
+  TEST_ASSERT_EQUAL_HEX32(0x00FF00, c.getPixel(170 % 53, 170 / 53));
   TEST_ASSERT_TRUE(a.tick(c, 5099));
   TEST_ASSERT_FALSE(a.tick(c, 5100));
   a.end();
