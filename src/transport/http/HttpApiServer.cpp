@@ -23,7 +23,6 @@
 #include "core/CoreEngine.h"
 #include "core/ProvisioningPolicy.h"
 #include "core/api/ApiRouter.h"
-#include "platform/BuildFeatures.h"
 #include "core/api/MelodiesApi.h"
 #include "core/api/JsonStream.h"
 #include "core/api/JsonWriter.h"
@@ -38,7 +37,7 @@
 #include "core/script/ScriptServices.h"
 #endif
 #include "hal/IBoard.h"
-#include "media/AssetFile.h"
+
 #include "persistence/DeviceConfig.h"
 #include "persistence/Filesystem.h"
 #include "persistence/LittleFsRestoreSink.h"
@@ -1188,7 +1187,6 @@ void HttpApiServer::listDir(const char* dir) {
   server_->setContentLength(CONTENT_LENGTH_UNKNOWN);
   server_->send(200, "application/json", "");
   server_->sendContent("{\"files\":[");
-  const std::string base = dir;
   std::string batch;
   batch.reserve(kListBatchBytes + kListEntryReserveBytes);
   File root = dir[0] == '/' ? LittleFS.open(dir, "r") : File();

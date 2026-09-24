@@ -22,7 +22,9 @@ void state_without_script_host() {
   TEST_ASSERT_TRUE(script::scriptInfo(nullptr).empty());
   const auto apps = buildAppsJson(engine);
   TEST_ASSERT_TRUE(api::isWellFormed(apps));
-  TEST_ASSERT_EQUAL_STRING("[]", apps.c_str());
+  TEST_ASSERT_NOT_EQUAL(std::string::npos, apps.find("\"name\":\"Time\""));
+  TEST_ASSERT_NOT_EQUAL(std::string::npos, apps.find("\"origin\":\"builtin\""));
+  TEST_ASSERT_EQUAL(std::string::npos, apps.find("\"origin\":\"script\""));
   DeviceFacts facts;
   facts.soc = "rp2040"; facts.freeHeapBytes = 12345; facts.resetReason = "software";
   const auto device = buildDeviceJson(engine, "test-id", facts);

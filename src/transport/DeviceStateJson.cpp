@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include "system/ResetReason.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "AppConfig.h"
