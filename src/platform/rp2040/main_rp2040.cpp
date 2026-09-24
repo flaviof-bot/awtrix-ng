@@ -18,6 +18,13 @@ static_assert(!AWTRIX_FEATURE_SCRIPTING && !AWTRIX_FEATURE_MP3 &&
 
 namespace {
 using namespace awtrix;
+class UnsetClock final : public IPageClock {
+ public:
+  void fill(RenderCtx& ctx, int64_t nowMs) override {
+    ctx.nowMs = nowMs;
+    ctx.epochMs = -1; // No NTP/RTC yet; built-ins render their unset-clock state.
+  }
+};
 class Display final : public IDisplayService {
  public:
   void sendScreen() override {} // No transport in this phase.
@@ -38,6 +45,9 @@ sound::AudioRouter audio; // Null sinks honestly report MP3/radio unavailable.
 Display display;
 System systemService;
 AppRegistry apps;
+EffectRegistry effects;
+EffectRegistry overlays;
+UnsetClock pageClock;
 TimeApp timeApp;
 DateApp dateApp;
 int64_t nextFrameMs = 0;
@@ -64,6 +74,9 @@ void setup() {
   deps.engine = engine;
   deps.apps = &apps;
   deps.audio = &audio;
+  deps.effects = &effects;
+  deps.overlays = &overlays;
+  deps.clock = &pageClock;
   deps.fonts[0] = &awtrix::awtrixFont(awtrix::FontId::Small);
   deps.fonts[1] = &awtrix::awtrixFont(awtrix::FontId::Large);
   pipeline = new awtrix::RenderPipeline(board->matrixWidth(), board->matrixHeight(), deps);
