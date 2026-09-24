@@ -18,6 +18,7 @@ class GalacticUnicornBoard final : public IBoard {
   int matrixHeight() const override { return height_; }
   void begin() override;
   void show(const Canvas&) override;
+  void logRefreshProgress() const;
   void setBrightness(uint8_t brightness) override { brightness_ = brightness; updateGrade(); }
   void setMatrixLayout(const MatrixLayout&) override {} // Fixed physical wiring.
   void applyColorGrade(const render::GradeParams& grade) override { baseGrade_ = grade; updateGrade(); }

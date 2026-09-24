@@ -1,8 +1,13 @@
 #include "transport/net/NetworkService.h"
 
-#include <ESPmDNS.h>
 #include <WiFi.h>
+#if defined(AWTRIX_PLATFORM_RP2040)
+#include <LEAmDNS.h>
+#include "platform/rp2040/WifiCompat.h"
+#else
+#include <ESPmDNS.h>
 #include <esp_wifi.h>
+#endif
 
 #include <cstring>
 
@@ -22,6 +27,23 @@ constexpr unsigned long kApRetryMs = 30000;
 constexpr unsigned long kCheckMs = 5000;
 constexpr int kWeakChecksBeforeRoam = 6;
 constexpr unsigned long kRoamCooldownMs = 300000;
+
+void joinStation(const DeviceConfig& cfg, bool apMode) {
+#if defined(AWTRIX_PLATFORM_RP2040)
+  platform::pico::join(WiFi, apMode ? WIFI_AP_STA : WIFI_STA,
+                       cfg.wifiSsid.c_str(), cfg.wifiPass.c_str());
+#else
+  WiFi.begin(cfg.wifiSsid.c_str(), cfg.wifiPass.c_str());
+#endif
+}
+
+void reconnectStation(const DeviceConfig& cfg) {
+#if defined(AWTRIX_PLATFORM_RP2040)
+  joinStation(cfg, false);
+#else
+  WiFi.reconnect();
+#endif
+}
 
 net::WifiAssoc assocNow(bool apMode) {
   // In provisioning mode the station side is only ever mid-retry: a successful join restarts the
@@ -52,6 +74,7 @@ void NetworkService::begin(const DeviceConfig& cfg, bool forceAp,
   WiFi.persistent(true);
   WiFi.setHostname(hostname_.c_str());
   WiFi.mode(WIFI_STA);
+#if !defined(AWTRIX_PLATFORM_RP2040)
   // Widest legal channel set (1-13) so an AP on 12 or 13 is visible; the regulatory domain is
   // corrected from the AP's country IE once we associate.
   wifi_country_t country = {};
@@ -65,18 +88,25 @@ void NetworkService::begin(const DeviceConfig& cfg, bool forceAp,
   esp_wifi_set_ps(WIFI_PS_NONE);
   WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
   WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+#endif
 
   if (cfg.netStatic && !cfg.ip.empty()) {
+#if defined(AWTRIX_PLATFORM_RP2040)
+    platform::pico::configureStatic(WiFi, parseIp(cfg.ip), parseIp(cfg.gateway),
+        parseIp(cfg.subnet), cfg.dns1.empty() ? parseIp(cfg.gateway) : parseIp(cfg.dns1),
+        cfg.dns2.empty() ? IPAddress(0, 0, 0, 0) : parseIp(cfg.dns2));
+#else
     WiFi.config(parseIp(cfg.ip), parseIp(cfg.gateway), parseIp(cfg.subnet),
                 cfg.dns1.empty() ? parseIp(cfg.gateway) : parseIp(cfg.dns1),
                 cfg.dns2.empty() ? IPAddress(0, 0, 0, 0) : parseIp(cfg.dns2));
+#endif
   }
 
   cfg_ = &cfg;
   const unsigned long timeoutMs =
       cfg.wifiConnectTimeout > 0 ? static_cast<unsigned long>(cfg.wifiConnectTimeout) : 15000UL;
   if (!forceAp && !cfg.wifiSsid.empty()) {
-    WiFi.begin(cfg.wifiSsid.c_str(), cfg.wifiPass.c_str());
+    joinStation(cfg, false);
     if (status_) net::applyWifiAssoc(*status_, net::WifiAssoc::Joining, true, cfg.wifiSsid, "");
     const unsigned long start = millis();
     // Blocks boot until the join succeeds or times out; onWait keeps the boot animation moving so
@@ -101,7 +131,11 @@ void NetworkService::begin(const DeviceConfig& cfg, bool forceAp,
     logf("wifi: connected to \"%s\" (%d dBm) as %s", WiFi.SSID().c_str(), WiFi.RSSI(),
          WiFi.localIP().toString().c_str());
     logf("heap: %u KB free with radio up",
+#if defined(AWTRIX_PLATFORM_RP2040)
+         (unsigned)(rp2040.getFreeHeap() / 1024));
+#else
          (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
+#endif
     if (MDNS.begin(hostname_.c_str())) {
       String mac = WiFi.macAddress();
       mac.replace(":", "");
@@ -123,6 +157,9 @@ void NetworkService::begin(const DeviceConfig& cfg, bool forceAp,
 }
 
 void NetworkService::tick() {
+#if defined(AWTRIX_PLATFORM_RP2040)
+  if (!apMode_) MDNS.update();
+#endif
   if (apMode_) {
     dns_.processNextRequest();
     retryJoinFromAp();
@@ -135,7 +172,7 @@ void NetworkService::tick() {
   if (WiFi.status() != WL_CONNECTED) {
     logf("wifi: connection lost, reconnecting");
     weakChecks_ = 0;
-    WiFi.reconnect();
+    if (cfg_) reconnectStation(*cfg_);
     if (status_) net::noteWifiRetry(*status_, kCheckMs);
     return;
   }
@@ -157,7 +194,7 @@ void NetworkService::roamIfWeak(unsigned long nowMs) {
   lastRoamMs_ = nowMs;
   logf("wifi: %d dBm below the %d dBm roam threshold, looking for a stronger AP",
        static_cast<int>(WiFi.RSSI()), cfg_->wifiRoamRssi);
-  WiFi.reconnect();
+  reconnectStation(*cfg_);
 }
 
 // In provisioning mode, keep trying the stored credentials so the device recovers on its own once
@@ -172,7 +209,7 @@ void NetworkService::retryJoinFromAp() {
   if (WiFi.status() != WL_CONNECTED) {
     publishStatus();
     if (status_) net::noteWifiRetry(*status_, kApRetryMs);
-    WiFi.begin(cfg_->wifiSsid.c_str(), cfg_->wifiPass.c_str());
+    joinStation(*cfg_, true);
     return;
   }
   logf("wifi: joined \"%s\" from provisioning mode, restarting to leave the AP",
