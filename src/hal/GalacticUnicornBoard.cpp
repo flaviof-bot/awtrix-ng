@@ -6,14 +6,6 @@
 #include <pico/time.h>
 
 namespace awtrix {
-DeviceConfig galacticUnicornDefaults() {
-  DeviceConfig cfg;
-  cfg.panelWidth = 53;
-  cfg.panelHeight = 11;
-  cfg.panels = 1;
-  cfg.scriptingEnabled = false;
-  return cfg;
-}
 GalacticUnicornBoard::GalacticUnicornBoard(const DeviceConfig& cfg)
     : height_(galactic::sanitizeHeight(cfg.panelHeight)),
       invalidHeight_(cfg.panelHeight != height_) {}

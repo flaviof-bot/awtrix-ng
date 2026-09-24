@@ -1,7 +1,7 @@
 #pragma once
 #include "hal/IBoard.h"
 #include "hal/GalacticUnicornDisplay.h"
-#include "persistence/DeviceConfig.h"
+#include "hal/GalacticUnicornDefaults.h"
 #include <hardware/pio.h>
 
 namespace awtrix {
