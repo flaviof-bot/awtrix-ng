@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <LittleFS.h>
-#include <Preferences.h>
+#include "platform/Preferences.h"
 #include <WiFi.h>
 #if defined(AWTRIX_PLATFORM_RP2040)
 #include <pico/time.h>
