@@ -41,7 +41,7 @@ IBoard* board;
 CoreEngine* engine;
 Canvas* canvas;
 RenderPipeline* pipeline;
-sound::AudioRouter audio; // Null sinks honestly report MP3/radio unavailable.
+sound::AudioRouter audioRouter; // Null sinks honestly report MP3/radio unavailable.
 Display display;
 System systemService;
 AppRegistry apps;
@@ -61,7 +61,7 @@ void setup() {
   board = &awtrix::activeBoard(cfg);
   board->begin();
   canvas = new awtrix::Canvas(board->matrixWidth(), board->matrixHeight());
-  engine = new awtrix::CoreEngine(audio, display, systemService);
+  engine = new awtrix::CoreEngine(audioRouter, display, systemService);
   engine->setBatteryAvailable(false);
   engine->setTemperatureAvailable(false);
   engine->setHumidityAvailable(false);
@@ -73,7 +73,7 @@ void setup() {
   awtrix::RenderPipelineDeps deps;
   deps.engine = engine;
   deps.apps = &apps;
-  deps.audio = &audio;
+  deps.audio = &audioRouter;
   deps.effects = &effects;
   deps.overlays = &overlays;
   deps.clock = &pageClock;
@@ -89,7 +89,7 @@ void loop() {
   if (nowMs < nextFrameMs) { delay(1); return; }
   nextFrameMs = nowMs + awtrix::kFramePeriodMs;
   engine->tick(nowMs);
-  audio.tick(nowMs);
+  audioRouter.tick(nowMs);
   pipeline->renderFrame(*canvas, nowMs);
   board->show(*canvas);
   if (nowMs >= nextLogMs) {
