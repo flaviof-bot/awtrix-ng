@@ -12,6 +12,10 @@
 #include "hal/BoardRegistry.h"
 #include "hal/GalacticUnicornBoard.h"
 #include "media/AwtrixFontAdapter.h"
+#include "persistence/Filesystem.h"
+#include "persistence/NvsSettings.h"
+#include "persistence/AppOrderStore.h"
+#include <LittleFS.h>
 
 // Feature macros describe this build, not a claim that a runtime service exists.
 static_assert(!AWTRIX_FEATURE_SCRIPTING && !AWTRIX_FEATURE_MP3 &&
@@ -35,8 +39,14 @@ class System final : public ISystemService {
  public:
   void reboot() override { rebootPending = true; }
   void sleep(uint64_t) override { Serial.println("sleep unavailable"); }
-  void factoryReset() override { Serial.println("persistent config unavailable"); }
-  void resetSettings() override { Serial.println("persistent settings unavailable"); }
+  void factoryReset() override {
+    LittleFS.remove("/NVS/awtrix-cfg.bin");
+    resetSettings();
+  }
+  void resetSettings() override {
+    LittleFS.remove("/NVS/awtrix-ng.bin");
+    rebootPending = true;
+  }
   bool rebootPending = false;
 };
 IBoard* board;
@@ -54,18 +64,33 @@ TimeApp timeApp;
 DateApp dateApp;
 int64_t nextFrameMs = 0;
 int64_t nextLogMs = 0;
+awtrix::DeviceConfig config;
+bool storageReady = false;
+bool settingsDirty = false;
+int64_t lastSettingsSaveMs = 0;
 }
 
 void setup() {
   Serial.begin(115200);
   // Never wait for a USB host: the panel must boot with power alone.
-  const auto cfg = awtrix::galacticUnicornDefaults();
-  board = &awtrix::activeBoard(cfg);
+  storageReady = awtrix::fs::begin();
+  if (!storageReady) Serial.println("storage: mount failed; persistence unavailable");
+  config = awtrix::galacticUnicornDefaults();
+  if (storageReady) config.load();
+  board = &awtrix::activeBoard(config);
   board->begin();
   Serial.println(awtrix::api::capabilitiesJson({}, {}, {}, audioRouter.caps(),
                   awtrix::platform::buildFeatures()).c_str());
   canvas = new awtrix::Canvas(board->matrixWidth(), board->matrixHeight());
   engine = new awtrix::CoreEngine(audioRouter, display, systemService);
+  if (storageReady) {
+    awtrix::nvs::loadSettings(engine->state().settings());
+    awtrix::apporder::load(*engine);
+    engine->setOrderPersist(awtrix::apporder::save);
+    engine->state().subscribe([](awtrix::StateEvent event) {
+      if (event == awtrix::StateEvent::SettingsChanged) settingsDirty = true;
+    });
+  }
   engine->setBatteryAvailable(false);
   engine->setTemperatureAvailable(false);
   engine->setHumidityAvailable(false);
@@ -90,6 +115,11 @@ void setup() {
 
 void loop() {
   const int64_t nowMs = static_cast<int64_t>(time_us_64() / 1000);
+  if (settingsDirty && storageReady && !systemService.rebootPending && nowMs - lastSettingsSaveMs > 1500) {
+    awtrix::nvs::saveSettings(engine->state().settings());
+    settingsDirty = false;
+    lastSettingsSaveMs = nowMs;
+  }
   if (nowMs < nextFrameMs) { delay(1); return; }
   nextFrameMs = nowMs + awtrix::kFramePeriodMs;
   engine->tick(nowMs);

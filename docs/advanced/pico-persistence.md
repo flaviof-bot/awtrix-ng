@@ -1,0 +1,47 @@
+# Pico persistence
+
+The Galactic Unicorn builds reserve 512 KiB of LittleFS. Startup mounts it before
+loading device config, settings and app order. Like the ESP32 format-on-failed-mount
+policy, an unmountable volume is formatted (not just a blank first boot). A corrupt
+filesystem can therefore lose all its files; keep backups. Directories `/ICONS`,
+`/PALETTES`, `/MELODIES`, `/SCRIPTS` and `/NVS` are created at mount time.
+
+Device config (including WiFi credentials) and settings use the existing persistence
+interfaces. `platform/Preferences.h` selects ESP32 NVS or the Pico adapter. The Pico
+adapter implements only the Preferences subset AWTRIX uses: begin/end, strings,
+bool, signed/unsigned 32-bit values, float32, uint8/uint16, isKey/remove/clear.
+One namespace is an atomic transaction committed at **end()**, not at each put.
+Call end explicitly. Unchanged values do not cause a write. A failed commit is
+logged without printing keys or values; the existing void save APIs cannot report
+it to the caller. All access must remain on core 0, not in interrupts or core 1.
+
+Snapshots live at `/NVS/<namespace>.bin`, with a 16 KiB limit. The portable AXKV v1
+format is eight header bytes (`AXKV`, version 1, three zero bytes), followed by
+records (one-byte key length, one-byte type, two-byte little-endian payload length,
+key bytes, payload bytes), followed by a little-endian CRC32 of all preceding bytes.
+Numeric payloads are little endian; float payloads contain IEEE-754 binary32 bits.
+Keys and namespaces are 1–15 ASCII letters/digits/underscore/hyphen. Unknown types,
+duplicate keys, malformed lengths, invalid names, truncation, unsupported headers
+and checksum failures reject the whole namespace: callers retain defaults. Corrupt
+snapshots are not silently overwritten. Reset settings/factory reset can remove them.
+Credentials are plaintext, just as ordinary unencrypted NVS is; do not publish a dump.
+
+Writes stage a sibling `.tmp`, flush/close, verify its bytes, then rename over the
+previous snapshot. Leftover temporary files are ignored at boot. LittleFS's atomic
+rename preserves the old snapshot on interrupted publication. Host tests exercise
+round trips through a fresh store instance, read-only/type defaults, namespace
+isolation, corruption and failed replacement; physical power-cut testing still
+requires a board.
+
+App order uses the shared `/apploop.json` store. ScriptStore and RadioStore are no-op
+implementations on Pico (those features remain unavailable). The shared
+`LittleFsRestoreSink` stages asset entries and renames complete files, so aborting
+an entry does not delete an existing asset. `FsRestoreSink`, config JSON and the
+portable backup parser compile for Pico. This does not add HTTP/MQTT transport:
+the following network card must connect these adapters to the existing API and
+backup download routes. There is no new endpoint or backup format.
+
+Settings changes are coalesced over a 1.5 second save interval. Abrupt power loss
+inside that window can lose the most recent changes. Boot/reboot persistence and
+power-loss durability on actual flash remain hardware acceptance checks; host
+and firmware builds alone are not a claim that a physical Pico was reboot-tested.

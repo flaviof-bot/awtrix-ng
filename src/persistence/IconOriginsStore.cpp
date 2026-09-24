@@ -2,7 +2,6 @@
 
 #include <LittleFS.h>
 
-#include "persistence/VfsFile.h"
 
 namespace awtrix::iconorigins {
 namespace {
@@ -29,7 +28,9 @@ class LittleFsOrigins : public Backend {
     return false;
   }
   bool iconExists(const std::string& name) override {
-    return validName(name) && fs::isFile("/ICONS/" + name);
+    if (!validName(name)) return false;
+    File f = LittleFS.open(("/ICONS/" + name).c_str(), "r");
+    return f && !f.isDirectory();
   }
 };
 }
