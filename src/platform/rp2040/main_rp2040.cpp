@@ -27,6 +27,8 @@
 #include "core/render/ProvisioningScreen.h"
 #include "core/render/TextRenderer.h"
 #include "transport/net/NetworkService.h"
+#include "transport/http/HttpApiServer.h"
+#include "system/Log.h"
 #include "platform/rp2040/RadioStartup.h"
 #include "system/PeripheryService.h"
 #include "system/GalacticUnicornControls.h"
@@ -73,6 +75,7 @@ BuiltinCatalog builtins;
 PeripheryService periphery;
 GalacticUnicornControls controls;
 NetworkService network;
+HttpApiServer http;
 render::PowerAnimator* powerAnimator;
 int64_t nextFrameMs = 0;
 int64_t nextLogMs = 0;
@@ -161,6 +164,24 @@ void setup() {
   network.begin(config, forceAp, showBootLogo);
   timeService.apply(config.tz, config.ntpServer);
   networkWasConnected = network.isConnected();
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  mac.toLowerCase();
+  const uint16_t webPort = network.apMode() ? 80 :
+      (config.webPort > 0 ? static_cast<uint16_t>(config.webPort) : 80);
+  http.begin(webPort, *engine, *board, *canvas, mac.c_str(), config, network.apMode());
+  http.setCapabilitiesJson(std::make_shared<const std::string>(api::capabilitiesJson(
+      effects.names(), effects.paletteNames(), overlays.names(), audioRouter.caps(),
+      platform::buildFeatures())));
+  http.setOnConfigChanged([] {
+    const MatrixLayout layout = config.matrixLayout();
+    if (layout.width() == board->matrixWidth() && layout.height() == board->matrixHeight())
+      board->setMatrixLayout(layout);
+    engine->state().runtime().tempDecimals = config.tempDecimals;
+    logbuf::setVerbose(config.debugMode);
+    timeService.apply(config.tz, config.ntpServer);
+  });
+  periphery.setUid(mac.c_str());
 #if AWTRIX_PICO_UDP
   if (networkWasConnected) discovery.begin(network.hostname(), config.webPort);
 #endif
@@ -170,6 +191,7 @@ void setup() {
 void loop() {
   const int64_t nowMs = static_cast<int64_t>(time_us_64() / 1000);
   network.tick();
+  http.tick();
   const bool connected = network.isConnected();
   timeService.apply(config.tz, config.ntpServer, connected && !networkWasConnected);
 #if AWTRIX_PICO_UDP
