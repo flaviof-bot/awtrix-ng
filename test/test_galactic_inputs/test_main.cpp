@@ -105,7 +105,32 @@ void navigation_events_and_light() {
   f.engine.state().settings().autoBrightness = false; f.engine.state().settings().brightness = 123;
   f.now += 100; f.sample(); TEST_ASSERT_EQUAL(123,rt.brightnessActual);
 }
+void navigation_matches_commands_and_select_double_press() {
+  for (bool swapped : {false,true}) for (int button : {0,2}) {
+    Fixture f, api;
+    f.cfg.swapButtons = swapped;
+    f.sample(); api.sample();
+    f.board.buttons = {button == 0, false, button == 2};
+    f.sample(); f.now = 35; f.sample();
+    const bool next = (button == 2) != swapped;
+    api.engine.submit(Command(next ? CommandType::NextApp : CommandType::PreviousApp));
+    api.now = 35; api.sample();
+    f.now = api.now = 1000; f.sample(); api.sample();
+    TEST_ASSERT_EQUAL_STRING(api.engine.currentAppId().c_str(),f.engine.currentAppId().c_str());
+  }
+  Fixture f;
+  Command notification(CommandType::Notify); notification.payload = "{\"text\":\"test\",\"hold\":true}";
+  TEST_ASSERT_TRUE(f.engine.execute(notification) == DispatchResult::Ok);
+  TEST_ASSERT_TRUE(f.engine.hasNotification());
+  f.board.buttons.select = true; f.sample(); f.now = 35; f.sample();
+  TEST_ASSERT_FALSE(f.engine.hasNotification()); TEST_ASSERT_FALSE(f.engine.state().runtime().matrixOff);
+  f.board.buttons.select = false; f.now = 36; f.sample(); f.now = 71; f.sample();
+  f.board.buttons.select = true; f.now = 72; f.sample(); f.now = 107; f.sample();
+  TEST_ASSERT_TRUE(f.engine.state().runtime().matrixOff);
+  f.now = 1000; f.sample(); TEST_ASSERT_EQUAL(1,f.powerEvents);
+}
 int main() {
   UNITY_BEGIN(); RUN_TEST(debounce_press_hold_bounce); RUN_TEST(map_and_clamp);
-  RUN_TEST(extras_use_dispatcher_events); RUN_TEST(navigation_events_and_light); return UNITY_END();
+  RUN_TEST(extras_use_dispatcher_events); RUN_TEST(navigation_events_and_light);
+  RUN_TEST(navigation_matches_commands_and_select_double_press); return UNITY_END();
 }

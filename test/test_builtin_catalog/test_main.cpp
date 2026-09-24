@@ -14,7 +14,7 @@ void builtin_catalog_parity() {
     "Fireworks","LookingEyes","Matrix","MovingLine","Pacifica","PingPong","Plasma","PlasmaCloud",
     "Radar","Ripple","Snake","SwirlIn","SwirlOut","TheaterChase","TwinklingStars"};
   TEST_ASSERT_TRUE(expected == pf.names()); TEST_ASSERT_EQUAL(15,pf.paletteNames().size());
-  const std::vector<std::string> overlays = {"Drizzle","Frost","Rain","Snow","Storm","Thunder"};
+  const std::vector<std::string> overlays = {"drizzle","frost","rain","snow","storm","thunder"};
   TEST_ASSERT_TRUE(overlays == po.names());
   std::cout << "ESP32/Pico built-ins equal: " << api::capabilitiesJson(pf.names(),pf.paletteNames(),po.names(), {}) << '\n';
 }
