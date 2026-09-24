@@ -103,6 +103,18 @@ static void test_spec_background_and_absolute_draw() {
   for (std::size_t i = 0; i < p.c.size(); ++i)
     TEST_ASSERT_EQUAL_HEX32(0x123456u, p.c.data()[i]);
   p.everyRow();
+  DrawOp op;
+  op.kind = DrawKind::Pixel;
+  op.color = 0xFF0000u;
+  for (int y : {0, 10}) {
+    op.y = y;
+    s.extrasMut().draw.push_back(op);
+  }
+  renderSpec(p.c, s, font, SpecRender{});
+  TEST_ASSERT_EQUAL_HEX32(0xFF0000u, p.c.getPixel(0, 0));
+  TEST_ASSERT_EQUAL_HEX32(0xFF0000u, p.c.getPixel(0, 10));
+  TEST_ASSERT_EQUAL_HEX32(0x123456u, p.c.getPixel(0, 1));
+  p.check();
 }
 static void test_script_absolute_canvas() {
   Panel p;
