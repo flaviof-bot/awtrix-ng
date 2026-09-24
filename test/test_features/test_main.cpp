@@ -89,7 +89,7 @@ static void fixed_pins() {
   const auto& profile = pins::rp2040Profile();
   std::string error;
   TEST_ASSERT_TRUE(pins::validate(profile.defaults, profile, error));
-  const int pins::PinSet::*fields[] = {&pins::PinSet::matrix, &pins::PinSet::btnLeft,
+  int pins::PinSet::* const fields[] = {&pins::PinSet::matrix, &pins::PinSet::btnLeft,
       &pins::PinSet::btnSelect, &pins::PinSet::btnRight, &pins::PinSet::battery,
       &pins::PinSet::ldr, &pins::PinSet::buzzer, &pins::PinSet::i2cSda,
       &pins::PinSet::i2cScl, &pins::PinSet::dfRx, &pins::PinSet::dfTx,

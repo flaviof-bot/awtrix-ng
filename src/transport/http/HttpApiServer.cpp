@@ -672,6 +672,12 @@ void HttpApiServer::dispatch() {
   req.method = resolved.method;
   req.get = (req.method == "GET");
 
+  // Reject absent features before allocating bodies or serving transport-only routes.
+  if (featurePolicy(platform::buildFeatures(), req.path) == DispatchResult::Unavailable) {
+    dropRawBody();
+    sendResult(api::httpResponse({}, DispatchResult::Unavailable, {}));
+    return;
+  }
   if (takeBody(req)) return;
   if (rejectedByPolicy(req)) return;
 
