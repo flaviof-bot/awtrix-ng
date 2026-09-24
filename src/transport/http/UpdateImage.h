@@ -8,7 +8,7 @@ namespace awtrix {
 
 #if defined(AWTRIX_NATIVE)
 constexpr const char* kUpdateImageName = "";
-#elif defined(AWTRIX_SOC_RP2350)
+#elif defined(AWTRIX_PLATFORM_RP2040) && defined(PICO_RP2350) && PICO_RP2350
 constexpr const char* kUpdateImageName = "firmware-galactic-unicorn-2w.uf2";
 #elif defined(AWTRIX_PLATFORM_RP2040)
 constexpr const char* kUpdateImageName = "firmware-galactic-unicorn.uf2";

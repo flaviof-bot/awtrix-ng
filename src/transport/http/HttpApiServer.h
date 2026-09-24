@@ -3,6 +3,7 @@
 #include <FS.h>
 #include <WebServer.h>
 #if defined(AWTRIX_PLATFORM_RP2040)
+#include "platform/rp2040/WifiCompat.h"
 using HttpServerBase = HTTPServer;
 #else
 using HttpServerBase = WebServer;
@@ -137,6 +138,9 @@ class HttpApiServer {
   StoredScriptsFn storedScripts_;
   std::string respBuf_;
   bool apMode_ = false;
+#if defined(AWTRIX_PLATFORM_RP2040)
+  platform::pico::WifiScan wifiScan_;
+#endif
 };
 
 }

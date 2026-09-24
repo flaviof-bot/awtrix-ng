@@ -126,6 +126,14 @@ class HttpApiServer::BodyHandler : public RequestHandler {
   bool canRaw(String) override {
     return srv_.server_->clientContentLength() > kArenaBodyThresholdBytes;
   }
+#if defined(AWTRIX_PLATFORM_RP2040)
+  // Pico's parser invokes the newer overloads; the base implementations do
+  // not forward to the legacy hooks, even though those remain in the API.
+  bool canHandle(HttpServerBase&, HTTPMethod m, String uri) override {
+    return canHandle(m, uri);
+  }
+  bool canRaw(HttpServerBase&, String uri) override { return canRaw(uri); }
+#endif
   void raw(HttpServerBase& server, String uri, HTTPRaw& raw) override {
     srv_.collectBody(server, uri, raw);
   }
@@ -240,7 +248,7 @@ void HttpApiServer::begin(uint16_t port, CoreEngine& engine, IBoard& board, Canv
   server_ = new RawWebServer(port);
   static const char* kCollectHeaders[] = {"If-None-Match", "Content-Type",
                                           api::kMethodOverrideHeader};
-  server_->collectHeaders(kCollectHeaders, 3);
+  server_->collectHeaders(static_cast<const char**>(kCollectHeaders), std::size_t{3});
   // Each pair is (completion handler, per-chunk upload handler). The upload handler runs many times
   // while the body streams in and cannot answer the client; only the completion handler can.
   server_->on(
@@ -984,13 +992,18 @@ bool HttpApiServer::serveDiagnostics(const Request& req) {
   // Scanning takes seconds and would block the loop, so the first call starts it and answers 202;
   // the caller polls until a result array comes back.
   if (req.path == "/api/v1/system/wifi-scan") {
+#if defined(AWTRIX_PLATFORM_RP2040)
+    // Unlike ESP32, Pico reports zero (not FAILED) before the first scan.
+    const int n = wifiScan_.poll(WiFi);
+#else
     const int n = WiFi.scanComplete();
     if (n == WIFI_SCAN_FAILED) {
       WiFi.scanNetworks(true);
       sendJson(202, "{\"scanning\":true}");
       return true;
     }
-    if (n == WIFI_SCAN_RUNNING) {
+#endif
+    if (n < 0) {
       sendJson(202, "{\"scanning\":true}");
       return true;
     }
@@ -1001,7 +1014,7 @@ bool HttpApiServer::serveDiagnostics(const Request& req) {
     for (int i = 0; i < n; ++i) {
       if (i) out.put(',');
       out.put("{\"ssid\":");
-      out.putString(WiFi.SSID(i).c_str());
+      out.putString(String(WiFi.SSID(i)).c_str());
       out.put(",\"rssi\":");
       out.putInt(WiFi.RSSI(i));
       out.put(",\"enc\":");
@@ -1016,6 +1029,9 @@ bool HttpApiServer::serveDiagnostics(const Request& req) {
     out.flush();
     server_->sendContent("");
     WiFi.scanDelete();
+#if defined(AWTRIX_PLATFORM_RP2040)
+    wifiScan_.consumed();
+#endif
     return true;
   }
 
@@ -1084,10 +1100,9 @@ bool HttpApiServer::serveSounds(const Request& req) {
         filename = filename.substr(filename.find_last_of('/') + 1);
         const std::string name = api::melodies::nameFromFile(filename);
         if (name.empty()) continue;
-        media::PodBuffer<uint8_t> raw;
-        std::string content;
-        if (media::readAsset(std::string("/MELODIES/") + filename, raw))
-          content.assign(reinterpret_cast<const char*>(raw.data()), raw.size());
+        std::string content(file.size(), '\0');
+        const size_t read = file.read(reinterpret_cast<uint8_t*>(content.data()), content.size());
+        content.resize(read);
         const std::string entry =
             (first ? "" : ",") +
             api::melodies::entryJson(name, content, static_cast<uint32_t>(content.size()));
