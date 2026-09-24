@@ -36,8 +36,11 @@ requires a board.
 An adapter-level host test also runs the production DeviceConfig, NvsSettings,
 LittleFS adapter and restore sink against an explicitly simulated filesystem. It
 checks credentials, numeric types, non-default settings, height, short writes,
-rename failures and aborted asset restores. This caught a legacy cleanup bug:
-`ph` is the current panel-height key and must not be deleted by DeviceConfig::save.
+rename failures and aborted asset restores. On all platforms, `panelHeight` uses
+the fresh on-flash key `pheight`. The legacy per-tile height key `ph` is never read
+or migrated and is deleted by `DeviceConfig::save()`. A store with only `ph` keeps
+the default runtime height of 8; `pheight` round-trips independently, including 11.
+The JSON/API and backup/restore field remains `panelHeight`, not the on-flash key.
 
 App order uses the shared `/apploop.json` store. ScriptStore and RadioStore are no-op
 implementations on Pico (those features remain unavailable). The shared
