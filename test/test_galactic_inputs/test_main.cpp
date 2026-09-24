@@ -87,14 +87,14 @@ void navigation_events_and_light() {
   });
   f.engine.state().settings().blockNavigation = true; // Events still publish when navigation blocked.
   f.board.buttons.left = true; f.sample(); f.now = 34; f.sample(); TEST_ASSERT_EQUAL(0,f.buttonEvents);
-  f.now = 35; f.sample(); TEST_ASSERT_TRUE(rt.buttons.left); TEST_ASSERT_EQUAL_STRING("left:on",callback.c_str());
+  f.now = 35; f.sample(); TEST_ASSERT_TRUE(rt.buttons[0]); TEST_ASSERT_EQUAL_STRING("left:on",callback.c_str());
   f.now = 200; f.sample(); TEST_ASSERT_EQUAL(1,f.buttonEvents);
-  f.board.buttons = {}; f.sample(); f.now += 35; f.sample(); TEST_ASSERT_FALSE(rt.buttons.left);
+  f.board.buttons = {}; f.sample(); f.now += 35; f.sample(); TEST_ASSERT_FALSE(rt.buttons[0]);
   TEST_ASSERT_EQUAL_STRING("left:off",callback.c_str());
   f.board.buttons.select = true; f.sample(); f.now += 35; f.sample();
-  TEST_ASSERT_TRUE(rt.buttons.select); TEST_ASSERT_EQUAL_STRING("middle:on",callback.c_str());
+  TEST_ASSERT_TRUE(rt.buttons[1]); TEST_ASSERT_EQUAL_STRING("middle:on",callback.c_str());
   f.board.buttons.right = true; f.sample(); f.now += 35; f.sample();
-  TEST_ASSERT_TRUE(rt.buttons.right); TEST_ASSERT_EQUAL_STRING("right:on",callback.c_str());
+  TEST_ASSERT_TRUE(rt.buttons[2]); TEST_ASSERT_EQUAL_STRING("right:on",callback.c_str());
   f.engine.state().settings().autoBrightness = true; f.cfg.brightnessSmoothing = 0;
   f.board.raw = 4095;
   for (int i=0; i<6; ++i) { f.now += 100; f.sample(); }
