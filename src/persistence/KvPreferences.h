@@ -77,13 +77,14 @@ class KvPreferences {
   }
   uint32_t getNumber(const char* key, Type type, uint32_t fallback) const {
     const auto bytes = get(key, type);
-    if (bytes.empty()) return fallback;
+    if (bytes.empty() || bytes.size() > 4 || type == String) return fallback;
     uint32_t value = 0;
     for (std::size_t i = 0; i < bytes.size(); ++i)
       value |= uint32_t(static_cast<uint8_t>(bytes[i])) << (8 * i);
     return value;
   }
   std::size_t putNumber(const char* key, Type type, uint32_t value, unsigned width) {
+    if (width == 0 || width > 4 || type == String) return 0;
     std::string bytes;
     for (unsigned i = 0; i < width; ++i) bytes += char(value >> (8 * i));
     return put(key, type, bytes);

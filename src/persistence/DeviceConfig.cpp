@@ -47,7 +47,7 @@ void cfgPut(Preferences& p, const char* k, PanelColorOrder v) {
 // Matrix geometry keys from older firmware. Nothing reads them any more; save() deletes them so
 // they stop occupying entries in the NVS partition.
 const char* const kLegacyMatrixKeys[] = {"mwidth", "matlay", "mtilew", "morient", "mserp",
-                                         "mflipx", "mflipy", "ph",     "pnx",     "pny",
+                                         "mflipx", "mflipy", "pnx",     "pny",
                                          "cserp"};
 }
 

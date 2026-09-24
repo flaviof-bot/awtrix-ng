@@ -33,6 +33,12 @@ round trips through a fresh store instance, read-only/type defaults, namespace
 isolation, corruption and failed replacement; physical power-cut testing still
 requires a board.
 
+An adapter-level host test also runs the production DeviceConfig, NvsSettings,
+LittleFS adapter and restore sink against an explicitly simulated filesystem. It
+checks credentials, numeric types, non-default settings, height, short writes,
+rename failures and aborted asset restores. This caught a legacy cleanup bug:
+`ph` is the current panel-height key and must not be deleted by DeviceConfig::save.
+
 App order uses the shared `/apploop.json` store. ScriptStore and RadioStore are no-op
 implementations on Pico (those features remain unavailable). The shared
 `LittleFsRestoreSink` stages asset entries and renames complete files, so aborting

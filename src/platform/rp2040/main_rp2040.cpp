@@ -45,9 +45,11 @@ class System final : public ISystemService {
   }
   void resetSettings() override {
     LittleFS.remove("/NVS/awtrix-ng.bin");
+    resetPending = true;
     rebootPending = true;
   }
   bool rebootPending = false;
+  bool resetPending = false;
 };
 IBoard* board;
 CoreEngine* engine;
@@ -131,5 +133,9 @@ void loop() {
     Serial.printf("AWTRIX loop: %llu ms, heap free %u bytes\n",
                   static_cast<unsigned long long>(nowMs), rp2040.getFreeHeap());
   }
-  if (systemService.rebootPending) rp2040.reboot();
+  if (systemService.rebootPending) {
+    if (settingsDirty && storageReady && !systemService.resetPending)
+      awtrix::nvs::saveSettings(engine->state().settings());
+    rp2040.reboot();
+  }
 }

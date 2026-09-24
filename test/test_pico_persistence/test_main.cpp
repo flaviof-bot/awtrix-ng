@@ -33,9 +33,11 @@ void config_and_settings_reboot_roundtrip() {
   TEST_ASSERT_EQUAL(32100, after.wifiConnectTimeout);
   TEST_ASSERT_TRUE(after.mqttEnabled); TEST_ASSERT_EQUAL(22, after.minBrightness);
   Settings settings;
-  settings.applyRead(api::JsonReader("{\"BRI\":42}"));
+  settings.applyRead(api::JsonReader("{\"brightness\":42}"));
+  TEST_ASSERT_EQUAL(42, settings.brightness);
   nvs::saveSettings(settings);
   Settings loaded; nvs::loadSettings(loaded);
+  TEST_ASSERT_EQUAL(42, loaded.brightness);
   std::string a, b;
   api::JsonWriter wa(a), wb(b); settings.writeMembers(wa); loaded.writeMembers(wb);
   TEST_ASSERT_EQUAL_STRING(a.c_str(), b.c_str());
