@@ -98,6 +98,38 @@ jobs:
           path: dist/usb-*.bin
           if-no-files-found: error
 
+  pico-build:
+    name: Pico firmware build (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [galactic_unicorn, galactic_unicorn_2w]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Cache PlatformIO
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+      - name: Install PlatformIO
+        run: pip install -U platformio esptool
+      - name: Build firmware
+        run: pio run -e ${{ matrix.env }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uf2-${{ matrix.env }}
+          path: .pio/build/${{ matrix.env }}/firmware.uf2
+          if-no-files-found: error
+
   docs:
     name: API docs match the firmware
     runs-on: ubuntu-latest

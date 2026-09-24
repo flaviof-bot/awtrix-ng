@@ -16,6 +16,7 @@
 #include "core/CoreEngine.h"
 #include "core/SocProfile.h"
 #include "core/api/ApiRouter.h"
+#include "platform/BuildFeatures.h"
 #include "core/api/JsonCoerce.h"
 #include "core/api/JsonStream.h"
 #include "core/api/JsonWriter.h"
@@ -167,7 +168,6 @@ bool onlyKnownFields(httplib::Response& res, const std::string& body,
 }
 
 }
-
 struct SimHttpServer::Impl {
   httplib::Server svr;
   std::thread listener;
@@ -586,7 +586,8 @@ bool SimHttpServer::Impl::serveCommand(const httplib::Request& req, const std::s
                                        httplib::Response& res) {
   Command cmd;
   api::HttpResult immediate;
-  switch (api::routeHttp(method, req.path, std::string(req.body), cmd, immediate)) {
+  switch (api::routeHttp(method, req.path, std::string(req.body), cmd, immediate,
+                         platform::buildFeatures())) {
     case api::RouteOutcome::Respond:
       sendJson(res, immediate.status, immediate.body);
       return true;
