@@ -1,5 +1,6 @@
 #include <unity.h>
 #include <vector>
+#include "core/apps/IApp.h"
 #include "core/apps/SpecRenderer.h"
 #include "core/effects/effects/FadeEffect.h"
 #include "core/effects/effects/MoreEffects.h"
