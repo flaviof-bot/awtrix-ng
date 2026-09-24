@@ -16,6 +16,38 @@ using namespace awtrix;
 namespace awtrix { void logf(const char*, ...) {} }
 void setUp() { testFiles.clear(); testDirs.clear(); failWrite = failRename = false; }
 void tearDown() {}
+void legacy_panel_height_is_ignored_and_removed() {
+  Preferences p;
+  TEST_ASSERT_TRUE(p.begin("awtrix-cfg", false));
+  p.putInt("ph", 16);
+  p.end();
+  DeviceConfig cfg; cfg.load();
+  TEST_ASSERT_EQUAL(8, cfg.panelHeight);
+  cfg.save();
+  TEST_ASSERT_TRUE(p.begin("awtrix-cfg", true));
+  TEST_ASSERT_FALSE(p.isKey("ph"));
+  TEST_ASSERT_EQUAL(8, p.getInt("pheight", -1));
+  p.end();
+}
+void panel_height_uses_fresh_key() {
+  DeviceConfig cfg; cfg.panelHeight = 11; cfg.save();
+  Preferences p;
+  TEST_ASSERT_TRUE(p.begin("awtrix-cfg", true));
+  TEST_ASSERT_EQUAL(11, p.getInt("pheight", -1));
+  TEST_ASSERT_FALSE(p.isKey("ph"));
+  p.end();
+  // A stale legacy value must not override the fresh key either.
+  TEST_ASSERT_TRUE(p.begin("awtrix-cfg", false));
+  p.putInt("ph", 16);
+  p.end();
+  DeviceConfig loaded; loaded.load();
+  TEST_ASSERT_EQUAL(11, loaded.panelHeight);
+  loaded.save();
+  TEST_ASSERT_TRUE(p.begin("awtrix-cfg", true));
+  TEST_ASSERT_FALSE(p.isKey("ph"));
+  TEST_ASSERT_EQUAL(11, p.getInt("pheight", -1));
+  p.end();
+}
 void config_and_settings_reboot_roundtrip() {
   TEST_ASSERT_TRUE(fs::begin());
   TEST_ASSERT_TRUE(testDirs.count("/ICONS") && testDirs.count("/MELODIES") && testDirs.count("/PALETTES"));
@@ -75,6 +107,8 @@ void restore_and_disabled_stores() {
 }
 int main() {
   UNITY_BEGIN();
+  RUN_TEST(legacy_panel_height_is_ignored_and_removed);
+  RUN_TEST(panel_height_uses_fresh_key);
   RUN_TEST(config_and_settings_reboot_roundtrip);
   RUN_TEST(failed_writes_keep_last_config);
   RUN_TEST(restore_and_disabled_stores);
