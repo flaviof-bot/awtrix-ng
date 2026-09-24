@@ -111,7 +111,7 @@ void setup() {
   deps.fonts[0] = &awtrix::awtrixFont(awtrix::FontId::Small);
   deps.fonts[1] = &awtrix::awtrixFont(awtrix::FontId::Large);
   pipeline = new awtrix::RenderPipeline(board->matrixWidth(), board->matrixHeight(), deps);
-  Serial.printf("boot: AWTRIX NG %s on %s (%dx%d); no network/panel driver yet\n",
+  Serial.printf("boot: AWTRIX NG %s on %s (%dx%d); PIO/DMA panel, no network yet\n",
                 AWTRIX_NG_VERSION, board->name(), board->matrixWidth(), board->matrixHeight());
 }
 
@@ -127,6 +127,11 @@ void loop() {
   engine->tick(nowMs);
   audioRouter.tick(nowMs);
   pipeline->renderFrame(*canvas, nowMs);
+  const auto& settings = engine->state().settings();
+  board->applyColorGrade(awtrix::render::gradeFrom(settings));
+  // Manual setting until F4b wires the sensor/periphery auto-brightness path.
+  const int brightness = settings.brightness;
+  board->setBrightness(static_cast<uint8_t>(brightness < 0 ? 0 : brightness > 255 ? 255 : brightness));
   board->show(*canvas);
   if (nowMs >= nextLogMs) {
     nextLogMs = nowMs + 5000;
