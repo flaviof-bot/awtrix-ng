@@ -39,6 +39,37 @@ unsigned long joinTimeoutMs(const DeviceConfig& cfg) {
 unsigned long lastJoinMs = 0;
 bool joinedBefore = false;
 bool pinNextJoin = true;
+platform::pico::JoinResult lastJoin;
+// CYW43 has one radio: while the provisioning AP is up the station can only join on the AP's
+// channel, so a join from AP_STA fails unless the router happens to use it. The Pico drops the AP
+// for one join window instead, and less often than ESP32 retries.
+constexpr unsigned long kPicoApRetryMs = 60000;
+
+const char* cyw43LinkName(int link) {
+  switch (link) {
+    case CYW43_LINK_DOWN:    return "down";
+    case CYW43_LINK_JOIN:    return "joining";
+    case CYW43_LINK_NOIP:    return "no IP";
+    case CYW43_LINK_UP:      return "up";
+    case CYW43_LINK_FAIL:    return "failed";
+    case CYW43_LINK_NONET:   return "network not found";
+    case CYW43_LINK_BADAUTH: return "authentication rejected";
+    default:                 return "unknown";
+  }
+}
+
+// A pinned join (strongest BSSID) that has not connected after half the timeout gets the other half
+// as an unpinned join, so an AP that refuses the Pico can never cost the whole attempt.
+bool pinnedJoinStalled(unsigned long nowMs, unsigned long timeoutMs) {
+  return lastJoin.pinned && WiFi.status() != WL_CONNECTED && nowMs - lastJoinMs >= timeoutMs / 2;
+}
+
+void logPinnedFailure() {
+  const int link = cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA);
+  const uint8_t* b = lastJoin.bssid;
+  logf("wifi: %02x:%02x:%02x:%02x:%02x:%02x did not accept the join (cyw43 link %d, %s); "
+       "letting the radio choose", b[0], b[1], b[2], b[3], b[4], b[5], link, cyw43LinkName(link));
+}
 #endif
 
 void joinStation(const DeviceConfig& cfg, bool apMode) {
@@ -47,6 +78,7 @@ void joinStation(const DeviceConfig& cfg, bool apMode) {
                                       cfg.wifiSsid.c_str(), cfg.wifiPass.c_str(), pinNextJoin);
   lastJoinMs = millis();
   joinedBefore = true;
+  lastJoin = r;
   if (r.pinned)
     logf("wifi: joining \"%s\" via %02x:%02x:%02x:%02x:%02x:%02x (%d dBm, strongest AP)",
          cfg.wifiSsid.c_str(), r.bssid[0], r.bssid[1], r.bssid[2], r.bssid[3], r.bssid[4],
@@ -136,6 +168,12 @@ void NetworkService::begin(const DeviceConfig& cfg, bool forceAp,
     // Blocks boot until the join succeeds or times out; onWait keeps the boot animation moving so
     // the matrix does not look frozen.
     while (WiFi.status() != WL_CONNECTED && (millis() - start) < timeoutMs) {
+#if defined(AWTRIX_PLATFORM_RP2040)
+      if (pinnedJoinStalled(millis(), timeoutMs)) {
+        logPinnedFailure();
+        joinStation(cfg, false);
+      }
+#endif
       if (onWait) onWait();
       delay(10);
     }
@@ -143,17 +181,16 @@ void NetworkService::begin(const DeviceConfig& cfg, bool forceAp,
 
   if (forceAp || WiFi.status() != WL_CONNECTED) {
     apMode_ = true;
-    WiFi.mode(WIFI_AP_STA);
-    WiFi.softAP(hostname_.c_str());
-    dns_.setErrorReplyCode(DNSReplyCode::NoError);
-    dns_.start(53, "*", WiFi.softAPIP());
-    logf("wifi: %s, provisioning AP \"%s\" at %s (captive portal)",
-         forceAp ? "forced by button" : "no connection", hostname_.c_str(),
-         WiFi.softAPIP().toString().c_str());
+    startAp(forceAp ? "forced by button" : "no connection");
   } else {
     apMode_ = false;
     logf("wifi: connected to \"%s\" (%d dBm) as %s", WiFi.SSID().c_str(), WiFi.RSSI(),
          WiFi.localIP().toString().c_str());
+#if defined(AWTRIX_PLATFORM_RP2040)
+    uint8_t b[6] = {};
+    WiFi.BSSID(b);
+    logf("wifi: associated with %02x:%02x:%02x:%02x:%02x:%02x", b[0], b[1], b[2], b[3], b[4], b[5]);
+#endif
     logf("heap: %u KB free with radio up",
 #if defined(AWTRIX_PLATFORM_RP2040)
          (unsigned)(rp2040.getFreeHeap() / 1024));
@@ -180,12 +217,21 @@ void NetworkService::begin(const DeviceConfig& cfg, bool forceAp,
     status_->setError(net::LinkError::Timeout);
 }
 
+void NetworkService::startAp(const char* why) {
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAP(hostname_.c_str());
+  dns_.setErrorReplyCode(DNSReplyCode::NoError);
+  dns_.start(53, "*", WiFi.softAPIP());
+  logf("wifi: %s, provisioning AP \"%s\" at %s (captive portal)", why, hostname_.c_str(),
+       WiFi.softAPIP().toString().c_str());
+}
+
 void NetworkService::tick() {
 #if defined(AWTRIX_PLATFORM_RP2040)
   if (!apMode_) MDNS.update();
 #endif
   if (apMode_) {
-    dns_.processNextRequest();
+    if (!apPaused_) dns_.processNextRequest();
     retryJoinFromAp();
     return;
   }
@@ -238,6 +284,38 @@ void NetworkService::roamIfWeak(unsigned long nowMs) {
 // disrupts the portal they are using.
 void NetworkService::retryJoinFromAp() {
   if (!cfg_ || cfg_->wifiSsid.empty()) return;
+#if defined(AWTRIX_PLATFORM_RP2040)
+  const unsigned long nowMs = millis();
+  if (apPaused_) {
+    if (WiFi.status() == WL_CONNECTED) {
+      logf("wifi: joined \"%s\" from provisioning mode, restarting to leave the AP",
+           WiFi.SSID().c_str());
+      if (onJoinedFromAp_) onJoinedFromAp_();
+      return;
+    }
+    const unsigned long timeoutMs = joinTimeoutMs(*cfg_);
+    if (pinnedJoinStalled(nowMs, timeoutMs)) {
+      logPinnedFailure();
+      joinStation(*cfg_, false);
+      return;
+    }
+    if (nowMs - lastJoinMs < timeoutMs) return;
+    apPaused_ = false;
+    lastApRetryMs_ = nowMs;
+    const int link = cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA);
+    logf("wifi: rejoin failed (cyw43 link %d, %s)", link, cyw43LinkName(link));
+    startAp("still no connection");
+    return;
+  }
+  if (WiFi.softAPgetStationNum() > 0) return;
+  if (nowMs - lastApRetryMs_ < kPicoApRetryMs) return;
+  publishStatus();
+  if (status_) net::noteWifiRetry(*status_, kPicoApRetryMs);
+  logf("wifi: pausing the provisioning AP for a station-only join");
+  dns_.stop();
+  apPaused_ = true;
+  joinStation(*cfg_, false);  // WIFI_STA: arduino-pico's begin() tears the AP down
+#else
   if (WiFi.softAPgetStationNum() > 0) return;
   const unsigned long now = millis();
   if (now - lastApRetryMs_ < kApRetryMs) return;
@@ -251,6 +329,7 @@ void NetworkService::retryJoinFromAp() {
   logf("wifi: joined \"%s\" from provisioning mode, restarting to leave the AP",
        WiFi.SSID().c_str());
   if (onJoinedFromAp_) onJoinedFromAp_();
+#endif
 }
 
 bool NetworkService::isConnected() const { return !apMode_ && WiFi.status() == WL_CONNECTED; }
