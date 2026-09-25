@@ -87,6 +87,10 @@ JoinResult join(Wifi& wifi, Mode mode, const char* ssid, const char* password, b
   else
     wifi.begin(ssid, password);
   wifi.mode(mode);
+  // ESP32 runs with esp_wifi_set_ps(WIFI_PS_NONE). The CYW43 default (CYW43_PERFORMANCE_PM) is
+  // still power-save mode 2, which drops links on some mesh routers. begin() can re-initialise the
+  // radio, so apply it after every join.
+  wifi.noLowPowerMode();
   return r;
 }
 }

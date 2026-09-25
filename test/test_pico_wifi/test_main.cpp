@@ -23,6 +23,8 @@ struct Wifi {
   int RSSI(uint8_t i) { return air[i].rssi; }
   uint8_t* BSSID(uint8_t i, uint8_t* out) { memcpy(out, air[i].bssid, 6); return out; }
   void scanDelete() { ++scanDeletes; }
+  int powerSaveOffs = 0;
+  void noLowPowerMode() { ++powerSaveOffs; }
   void begin(const char* s, const char* p, const uint8_t* bssid = nullptr) {
     // Pinned arduino-pico _beginInternal: end() unless AP_STA, then sets STA.
     if (current != ApSta) ++apTearDowns;
@@ -65,6 +67,7 @@ void join_pins_the_strongest_bssid_of_the_same_ssid() {
   TEST_ASSERT_NOT_NULL(w.pinned);
   TEST_ASSERT_EQUAL(3, w.pinnedCopy[5]);  // not the far AP, not the stronger foreign SSID
   TEST_ASSERT_EQUAL(1, w.scans); TEST_ASSERT_EQUAL(1, w.scanDeletes);
+  TEST_ASSERT_EQUAL(1, w.powerSaveOffs);  // ESP32 parity: no Wi-Fi power save
 }
 void join_falls_back_to_unpinned_when_the_ssid_is_not_seen() {
   Wifi w;
