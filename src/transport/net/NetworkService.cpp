@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #if defined(AWTRIX_PLATFORM_RP2040)
 #include <LEAmDNS.h>
+#include <pico/cyw43_arch.h>
 #include "platform/rp2040/WifiCompat.h"
 #else
 #include <ESPmDNS.h>
@@ -28,10 +29,32 @@ constexpr unsigned long kCheckMs = 5000;
 constexpr int kWeakChecksBeforeRoam = 6;
 constexpr unsigned long kRoamCooldownMs = 300000;
 
+unsigned long joinTimeoutMs(const DeviceConfig& cfg) {
+  return cfg.wifiConnectTimeout > 0 ? static_cast<unsigned long>(cfg.wifiConnectTimeout) : 15000UL;
+}
+
+#if defined(AWTRIX_PLATFORM_RP2040)
+// Pico join bookkeeping. A pinned join (strongest BSSID from a scan) that fails is followed by an
+// unpinned one, so a scan quirk or a hidden SSID can never lock the device out.
+unsigned long lastJoinMs = 0;
+bool joinedBefore = false;
+bool pinNextJoin = true;
+#endif
+
 void joinStation(const DeviceConfig& cfg, bool apMode) {
 #if defined(AWTRIX_PLATFORM_RP2040)
-  platform::pico::join(WiFi, apMode ? WIFI_AP_STA : WIFI_STA,
-                       cfg.wifiSsid.c_str(), cfg.wifiPass.c_str());
+  const auto r = platform::pico::join(WiFi, apMode ? WIFI_AP_STA : WIFI_STA,
+                                      cfg.wifiSsid.c_str(), cfg.wifiPass.c_str(), pinNextJoin);
+  lastJoinMs = millis();
+  joinedBefore = true;
+  if (r.pinned)
+    logf("wifi: joining \"%s\" via %02x:%02x:%02x:%02x:%02x:%02x (%d dBm, strongest AP)",
+         cfg.wifiSsid.c_str(), r.bssid[0], r.bssid[1], r.bssid[2], r.bssid[3], r.bssid[4],
+         r.bssid[5], r.rssi);
+  else
+    logf("wifi: joining \"%s\" (%s)", cfg.wifiSsid.c_str(),
+         pinNextJoin ? "not seen in scan" : "unpinned retry");
+  pinNextJoin = !r.pinned;
 #else
   WiFi.begin(cfg.wifiSsid.c_str(), cfg.wifiPass.c_str());
 #endif
@@ -39,6 +62,8 @@ void joinStation(const DeviceConfig& cfg, bool apMode) {
 
 void reconnectStation(const DeviceConfig& cfg) {
 #if defined(AWTRIX_PLATFORM_RP2040)
+  // A second begin() would abort a join that is still in progress.
+  if (!platform::pico::joinDue(millis(), lastJoinMs, joinedBefore, joinTimeoutMs(cfg))) return;
   joinStation(cfg, false);
 #else
   WiFi.reconnect();
@@ -103,8 +128,7 @@ void NetworkService::begin(const DeviceConfig& cfg, bool forceAp,
   }
 
   cfg_ = &cfg;
-  const unsigned long timeoutMs =
-      cfg.wifiConnectTimeout > 0 ? static_cast<unsigned long>(cfg.wifiConnectTimeout) : 15000UL;
+  const unsigned long timeoutMs = joinTimeoutMs(cfg);
   if (!forceAp && !cfg.wifiSsid.empty()) {
     joinStation(cfg, false);
     if (status_) net::applyWifiAssoc(*status_, net::WifiAssoc::Joining, true, cfg.wifiSsid, "");
@@ -170,12 +194,24 @@ void NetworkService::tick() {
   lastCheckMs_ = nowMs;
   publishStatus();
   if (WiFi.status() != WL_CONNECTED) {
-    logf("wifi: connection lost, reconnecting");
     weakChecks_ = 0;
+#if defined(AWTRIX_PLATFORM_RP2040)
+    // Only log when a new attempt starts; the raw CYW43 link state says why the link is down.
+    if (cfg_ && platform::pico::joinDue(nowMs, lastJoinMs, joinedBefore, joinTimeoutMs(*cfg_))) {
+      logf("wifi: connection lost (status %d, cyw43 link %d), rejoining",
+           static_cast<int>(WiFi.status()), cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA));
+      reconnectStation(*cfg_);
+    }
+#else
+    logf("wifi: connection lost, reconnecting");
     if (cfg_) reconnectStation(*cfg_);
+#endif
     if (status_) net::noteWifiRetry(*status_, kCheckMs);
     return;
   }
+#if defined(AWTRIX_PLATFORM_RP2040)
+  pinNextJoin = true;
+#endif
   roamIfWeak(nowMs);
 }
 
