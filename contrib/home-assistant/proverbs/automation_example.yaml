@@ -11,8 +11,8 @@
       toggle_helper: input_boolean.proverb_notify
       notification_text: "{{ states('sensor.proverb') }}"
       my_icon: ''
-      icon_mode: 0
-      text_case: 0
+      icon_mode: fixed
+      text_case: asTyped
       background_color: "{{ states('sensor.proverb_background_color') | from_json([0, 0, 0]) }}"
       text_color: "{{ states('sensor.proverb_text_color') | from_json([255, 255, 255]) }}"
       gradient_1: [0, 0, 0]
