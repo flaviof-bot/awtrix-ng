@@ -1,0 +1,31 @@
+# Append this list item to automations.yaml; do not include it as a package.
+- id: awtrix_proverb_notification
+  alias: AWTRIX proverb notification
+  use_blueprint:
+    path: smarthomejunkie/awtrix_ng/awtrix_ng_create_notification.yaml
+    input:
+      awtrix_displays:
+        - REPLACE_WITH_AWTRIX_DEVICE_ID
+      # Alternative: awtrix_displays: [] and extra_prefixes: [your_mqtt_prefix]
+      extra_prefixes: []
+      toggle_helper: input_boolean.proverb_notify
+      notification_text: "{{ states('sensor.proverb') }}"
+      my_icon: ''
+      icon_mode: 0
+      text_case: 0
+      background_color: "{{ states('sensor.proverb_background_color') | from_json([0, 0, 0]) }}"
+      text_color: "{{ states('sensor.proverb_text_color') | from_json([255, 255, 255]) }}"
+      gradient_1: [0, 0, 0]
+      gradient_2: [0, 0, 0]
+      show_rainbow: false
+      notification_name: proverb
+      play_alert_tone: false
+      sound_name: ''
+      sound_rtttl: ''
+      hold_notification: false
+      repeat: 1
+      duration: 0
+      stack: false
+      scroll: true
+      scrollspeed: 100
+      effect: ''
