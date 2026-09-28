@@ -18,10 +18,10 @@ notification_name play_alert_tone sound_name sound_rtttl hold_notification repea
 duration stack scroll scrollspeed effect'''.split()
 
 
-def prepare():
+def prepare(automation):
     (CONFIG / 'packages').mkdir(parents=True, exist_ok=True)
     shutil.copy(ROOT / 'packages/proverbs.yaml', CONFIG / 'packages/proverbs.yaml')
-    shutil.copy(ROOT / 'automation_example.yaml', CONFIG / 'automations.yaml')
+    shutil.copy(ROOT / automation, CONFIG / 'automations.yaml')
     (CONFIG / 'configuration.yaml').write_text(
         'homeassistant:\n  packages: !include_dir_named packages\n'
         'automation: !include automations.yaml\n')
@@ -74,7 +74,9 @@ async def templates():
 
 
 if __name__ == '__main__':
-    prepare()
-    subprocess.run(['python', '-m', 'homeassistant', '--script', 'check_config', '-c', str(CONFIG)], check=True)
-    print('PASS check_config (inert blueprint fixture only)', flush=True)
+    # Two variants: the blueprint instance, or the direct automation instead of it.
+    for automation in ('automation_example.yaml', 'automation_direct.yaml'):
+        prepare(automation)
+        subprocess.run(['python', '-m', 'homeassistant', '--script', 'check_config', '-c', str(CONFIG)], check=True)
+        print(f'PASS check_config with {automation} (inert blueprint fixture only)', flush=True)
     asyncio.run(templates())

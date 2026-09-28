@@ -1,0 +1,37 @@
+# Alternative to automation_example.yaml: append this list item to automations.yaml
+# INSTEAD of the blueprint instance, never both (both would send each proverb twice).
+# It publishes the proverb notification straight to AWTRIX NG, so it can use payload
+# keys the notification blueprint has no input for:
+#   font "large"        NG's 8-row font (the default "small" is 5 rows + descender)
+#   entry "offscreen"   start on a blank panel; the first letter enters at the right edge
+#   whenFits "scroll"   short proverbs enter the same way instead of standing still
+#   repeat 1            one full pass, ending when the last pixel leaves column 0. Without
+#                       it NG ends a notification after appDurationMs (7 s), mid-text.
+#   stack true          a new proverb queues behind one still scrolling instead of
+#                       replacing it, so the pacing's off/on never cuts a proverb short.
+# There is deliberately no "off" trigger: dismissing on off would cut the scrolling text.
+- id: proverb_notification_direct
+  alias: AWTRIX proverb notification (direct)
+  mode: queued
+  triggers:
+    - trigger: state
+      entity_id: input_boolean.proverb_notify
+      to: "on"
+  variables:
+    prefix: awtrix_xxxxxx   # your device's MQTT prefix (its mqtt_prefix sensor in HA)
+  actions:
+    - action: mqtt.publish
+      data:
+        topic: "{{ prefix }}/cmd/notify"
+        payload: >-
+          {{ {
+               "name": "proverb",
+               "text": states('sensor.proverb') | string,
+               "font": "large",
+               "backgroundColor": states('sensor.proverb_background_color') | from_json([0, 0, 0]),
+               "textColor": states('sensor.proverb_text_color') | from_json([255, 255, 255]),
+               "textCase": "asTyped",
+               "repeat": 1,
+               "stack": true,
+               "scroll": {"speed": 100, "entry": "offscreen", "whenFits": "scroll"}
+             } | tojson }}
