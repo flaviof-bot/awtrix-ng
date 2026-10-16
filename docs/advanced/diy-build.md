@@ -10,7 +10,7 @@ set after the first start.
 !!! tip "Rather not build one?"
     You can buy a ready-made clock instead: <!-- only esp32 -->[Get a clock](../getting-started/buy.md)<!-- /only --><!-- only esp32-s3 -->[Get a clock](site:getting-started/buy/)<!-- /only -->.
 
-AWTRIX NG runs on **any WS2812-style LED panel 8 pixels high and 32 to 128 pixels wide**, on an
+AWTRIX NG runs on **any WS2812-style LED panel 8 to 16 pixels high and 32 to 128 pixels wide**, on an
 <!-- only esp32 -->ESP32<!-- /only --><!-- only esp32-s3 -->ESP32-S3<!-- /only --> board you wired yourself.
 
 Your build needs only two things: an **LED panel on a supported data pin** and **power**.
@@ -79,7 +79,7 @@ many icons and scripts, and its PSRAM (extra memory) is needed for
 <!-- only esp32-s3 -->
 | **ESP32-S3 DevKitC-1 N16R8** (or another ESP32-S3 board) | See above. |
 <!-- /only -->
-| **WS2812B panel, 8 pixels high** | 32 x 8 is the classic size. Several smaller panels in a row work too. The total width must be 32–128 px. SK6812 and compatible clones work. **APA102, SK9822 and anything else with a separate clock line do not.** |
+| **WS2812B panel, 8 to 16 pixels high** | 32 x 8 is the classic size; set `panelHeight` for a taller one. Several smaller panels in a row work too. The total width must be 32–128 px. SK6812 and compatible clones work. **APA102, SK9822 and anything else with a separate clock line do not.** |
 | **5 V power supply** | Sizing is in [section 4](#4-power-the-panel-first). 5 V / 3-4 A for a 32 x 8 build. |
 | **1000 uF / 6.3 V+ electrolytic capacitor** | Across 5 V and GND at the panel input. |
 | **330-470 ohm resistor** | In series with the data line, at the board end. |
@@ -551,12 +551,13 @@ that pin high at startup, so the amplifier plays.
 
 ## 6. Describe the panel
 
-Tell AWTRIX how your panel is built. Every panel is 8 pixels high. The total width can be
+Tell AWTRIX how your panel is built. Every panel is `panelHeight` pixels high (8–16, default 8). The total width can be
 32–128.
 
 | Key | Range | Default | Meaning |
 |---|---|---|---|
 | `panelWidth` | 1-128 | `32` | Width of one panel. A new total width needs a restart. |
+| `panelHeight` | 8-16 | `8` | Height of every panel. A new height needs a restart. |
 | `panels` | 1-128 | `1` | How many identical panels the cable runs through, left to right. `panelWidth x panels` must be 32–128. |
 | `panelStart` | `topLeft` `topRight` `bottomLeft` `bottomRight` | `topLeft` | Corner of the first LED. |
 | `panelWiring` | `rows` `columns` | `rows` | Whether the strip runs along rows or down columns. |

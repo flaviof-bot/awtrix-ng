@@ -2832,6 +2832,7 @@ curl -X PUT http://<awtrix-ip>/api/v1/system \
 | `lowBatteryThreshold` | integer | `0` | 0–100 %. Below it `GET /api/v1/device` reports `lowBattery: true`. `0` = off |
 <!-- only esp32 esp32-s3 -->
 | `panelWidth` | integer | `32` | 1–128. `panelWidth × panels` must be 32–128 |
+| `panelHeight` | integer | `8` | 8–16; applies after a reboot |
 | `panels` | integer | `1` | 1–128. How many panels the LED strip runs through |
 | `panelStart` | string | `"topLeft"` | `topLeft` · `topRight` · `bottomLeft` · `bottomRight` |
 | `panelWiring` | string | `"rows"` | `rows` · `columns` |

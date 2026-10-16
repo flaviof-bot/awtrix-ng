@@ -405,12 +405,13 @@ greater than `maxBrightness`.
 
 Your LED matrix is described as **panels**: how wide one panel is, how many panels the data cable
 runs through, where the cable enters, and how the LED strip runs inside a panel. The total width is
-`panelWidth × panels`. Every panel is 8 pixels high. All panels form one row, left to right, on one
+`panelWidth × panels`; every panel is `panelHeight` pixels high (8–16, default 8). All panels form one row, left to right, on one
 data pin.
 
 | Key | Type | Range | Default | Effect | Reboot |
 |---|---|---|---|---|---|
 | `panelWidth` | int | 1–128 | `32` | Width of one panel in pixels. | yes, if the total width changes |
+| `panelHeight` | int | 8–16 | `8` | Height of every panel in pixels. Outside the range the write is `422 validationFailed` on `panelHeight`. | yes |
 | `panels` | int | 1–128 | `1` | How many identical panels the strip runs through, left to right. `panelWidth × panels` must be 32–128, otherwise the write is `422 validationFailed` on `panelWidth`. | yes, if the total width changes |
 | `panelStart` | enum | `topLeft` `topRight` `bottomLeft` `bottomRight` | `topLeft` | The corner of the first LED. Upper and lower case do not matter; anything else is `422`. | no |
 | `panelWiring` | enum | `rows` `columns` | `rows` | Whether the strip runs along the rows or down the columns inside a panel. | no |
@@ -430,10 +431,10 @@ The keys fall into three groups:
 - `mirror` and `rotate` change how the **picture** is shown. Only `rotate` swaps the buttons;
   `panelStart: bottomRight` only describes the cable, not the picture.
 
-Wiring changes show on the next frame. A new total width needs a restart
+Wiring changes show on the next frame. A new total width or height needs a restart
 (`POST /api/v1/device/reboot`).
 
-The panel is 8 pixels high and 32–128 pixels wide, so at most 1024 LEDs. If AWTRIX
+The panel is 8–16 pixels high and 32–128 pixels wide, so at most 2048 LEDs. If AWTRIX
 cannot use the stored size at startup, it shows 32×8 instead and keeps your stored values. If even
 that fails, the panel stays dark, but the web UI and API still work.
 

@@ -210,8 +210,8 @@ already changed.
 | --- | --- | --- |
 <!-- only esp32 esp32-s3 -->
 | Panel width | [`panelWidth × panels`](system.md#panel-and-orientation), default `32 × 1`, total 32–128 | `422 validationFailed` |
-| Display height | 8, cannot be changed | - |
-| Total pixels | at most 1024 (128 × 8) | follows from width and height. Read the limits of your device in `capabilities.display` |
+| Display height | [`panelHeight`](system.md#panel-and-orientation), 8–16 pixels, default `8`; applies after a reboot | `422 validationFailed` on `panelHeight` |
+| Total pixels | at most 2048 (128 × 16) | follows from width and height. Read the limits of your device in `capabilities.display` |
 <!-- /only -->
 <!-- only tc002 -->
 | Display size | 52 × 16 = 832 pixels, cannot be changed | - |

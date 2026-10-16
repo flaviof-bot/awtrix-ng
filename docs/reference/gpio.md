@@ -498,7 +498,7 @@ A panel you built yourself also needs a description: the width of one panel, how
 cable runs through, the corner where the data enters, whether the LED strip runs along rows or
 columns, and whether every second row runs back the other way.
 
-Every panel is 8 pixels high and `panelWidth × panels` is 32–128. The default is 32×8.
+Every panel is `panelHeight` pixels high (8–16) and `panelWidth × panels` is 32–128. The default is 32×8.
 
 All panel keys, their ranges and the values for common builds are in
 [Panel and orientation](system.md#panel-and-orientation). They are set with `PUT /api/v1/system`.

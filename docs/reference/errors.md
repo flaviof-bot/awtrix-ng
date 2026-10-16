@@ -591,6 +591,7 @@ nothing, and `field` names the key:
 | `minBrightness`, `maxBrightness` | 0–255 |
 <!-- only esp32 esp32-s3 -->
 | `panelWidth` | 1–128 |
+| `panelHeight` | 8–16 |
 | `panels` | 1–128 |
 <!-- /only -->
 | `tempOffset` | −20–20 |

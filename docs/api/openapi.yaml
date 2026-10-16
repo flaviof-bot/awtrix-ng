@@ -4058,10 +4058,19 @@ components:
           minimum: 1
           maximum: 128
           description: >
-            Width of one panel in pixels. Every panel is 8 pixels high.
+            Width of one panel in pixels. Every panel is panelHeight pixels high.
             panelWidth x panels must come to between 32 and 128, or the write
             is rejected with 422 on panelWidth. A change of the total width
             applies after a reboot.
+        panelHeight:
+          x-only: [esp32, esp32-s3]
+          type: integer
+          default: 8
+          minimum: 8
+          maximum: 16
+          description: >
+            Height of every panel in pixels. A value outside 8..16 is rejected
+            with 422 on panelHeight. Applies after a reboot.
         panels:
           x-only: [esp32, esp32-s3]
           type: integer
