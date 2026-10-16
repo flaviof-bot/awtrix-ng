@@ -3,6 +3,7 @@
 #include <unity.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -1706,8 +1707,67 @@ static void test_a_pushed_icon_carries_the_whole_gap_off_the_panel() {
   TEST_ASSERT_EQUAL_INT(-11, furthest);
 }
 
+// Enlarges the stage onto the frame two to one, the way a 52x16 panel shows a 26x8 page.
+struct ScalingZoom : FakeZoom {
+  ScalingZoom() : FakeZoom(26, 8) {}
+  void present(Canvas& frame) const override {
+    FakeZoom::present(frame);
+    for (int y = 0; y < frame.height(); ++y)
+      for (int x = 0; x < frame.width(); ++x) frame.setPixel(x, y, page.getPixel(x / 2, y / 2));
+  }
+};
+
+static uint32_t frameHash(const Canvas& c) {
+  uint32_t h = 2166136261u;
+  for (int y = 0; y < c.height(); ++y)
+    for (int x = 0; x < c.width(); ++x) {
+      const uint32_t p = c.getPixel(x, y);
+      for (int shift = 0; shift < 32; shift += 8) {
+        h ^= (p >> shift) & 0xFFu;
+        h *= 16777619u;
+      }
+    }
+  return h;
+}
+
+// E1: a platform with an IPageZoom (TC002) keeps fb09bc5's frames exactly; the eight-row band is
+// only for panels without one. The hashes were recorded from this test built against the
+// sources of 1f213bd (fb09bc5's render code), then checked unchanged with the band in place.
+static void test_zoom_path_frames_are_unchanged() {
+  static const uint32_t kExpected[] = {0u, 0u, 0u, 0u, 0u, 0u, 0u};
+  ScalingZoom zoom;
+  Rig r(52, 16, nullptr, &zoom);
+  TimeApp timeApp;
+  r.apps.add(&timeApp);
+  r.engine.execute(cmd(CommandType::SetPushedApp, "ic",
+                       R"({"text":"AB","icon":"pushed","icons":[{"icon":"red","x":1,"y":1}]})"));
+  std::vector<uint32_t> hashes;
+  auto frames = [&](const char* id, int64_t t) {
+    if (id) r.engine.execute(switchFast(id));
+    r.engine.tick(t);
+    for (int64_t at : {t, t + 500}) {
+      r.pipe->renderFrame(r.canvas, at);
+      hashes.push_back(frameHash(r.canvas));
+    }
+  };
+  frames("ic", 0);
+  frames("Time", 1000);
+  zoom.on = false;
+  frames("ic", 2000);
+  r.engine.execute(cmd(CommandType::Notify, "", R"({"text":"HELLO","icon":"pushed","hold":true})"));
+  r.engine.tick(3000);
+  r.pipe->renderFrame(r.canvas, 3000);
+  hashes.push_back(frameHash(r.canvas));
+  TEST_ASSERT_EQUAL_INT(7, static_cast<int>(hashes.size()));
+  for (std::size_t i = 0; i < hashes.size(); ++i) {
+    printf("zoom-identity frame %u: 0x%08xu\n", static_cast<unsigned>(i), static_cast<unsigned>(hashes[i]));
+    TEST_ASSERT_EQUAL_HEX32(kExpected[i], hashes[i]);
+  }
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
+  RUN_TEST(test_zoom_path_frames_are_unchanged);
   RUN_TEST(test_icon_gap_sets_where_static_text_starts);
   RUN_TEST(test_scrolling_text_never_enters_a_wider_icon_gap);
   RUN_TEST(test_a_wide_icon_reserves_its_own_width_plus_the_gap);
