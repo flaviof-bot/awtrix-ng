@@ -275,6 +275,7 @@ void RenderPipeline::renderPage(Canvas& dst, const std::string& id, int64_t nowM
     ctx.fonts = d_.fonts;
     d_.clock->fill(ctx, nowMs);
     ctx.shownSinceMs = slot == &slotB_ ? -1 : shownSinceMs_;
+    ctx.contentBand = !d_.zoom || !d_.zoom->available();
     app->render(dst, ctx);
     drawOverlay("", EffectSettings{});
   } else if (pushed) {

@@ -25,6 +25,10 @@ struct RenderCtx {
   int64_t epochMs = -1;
   const FontCatalog* fonts = nullptr;
   int64_t shownSinceMs = -1;
+  // Built-in apps lay out eight rows; on a taller panel they draw into the centred band of
+  // render::contentBand(). False where the platform enlarges pages instead (TC002), which keeps
+  // its frames as they were.
+  bool contentBand = true;
 };
 
 // Built-in apps are long-lived: render() is called every frame while the app is on screen, and there

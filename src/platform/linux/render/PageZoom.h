@@ -17,7 +17,7 @@ class PageZoom final : public IPageZoom {
  public:
   PageZoom(int width, int height, const IPageIcon& images);
 
-  bool available() const { return stage_.valid(); }
+  bool available() const override { return stage_.valid(); }
   bool enlarges(const Settings& settings, const AppSpec& page, uint32_t assets) override;
   Canvas& stage() override { return stage_; }
   void present(Canvas& frame) const override;

@@ -1707,6 +1707,66 @@ static void test_a_pushed_icon_carries_the_whole_gap_off_the_panel() {
   TEST_ASSERT_EQUAL_INT(-11, furthest);
 }
 
+// Compare every pixel with the same page on an eight-row panel. Guard words around the external
+// canvas catch writes beyond the physical framebuffer. 1.2.2 already centres page text and icons
+// on a taller canvas; this pins that to the same rows as the eight-row content band.
+static void checkTallPage(bool notification, const char* font) {
+  Rig shortRig(53, 8), tallRig(53, 11);
+  std::vector<uint32_t> guarded(53 * 11 + 2, 0xDEADBEEFu);
+  Canvas tall(53, 11, guarded.data() + 1);
+  const std::string payload = std::string("{\"text\":\"") +
+      (notification ? "AAAAAAAAAAAAAAAAAAAAAAAAAAAA" : "A") +
+      "\",\"icon\":\"1\",\"font\":\"" + font + "\"}";
+  for (Rig* r : {&shortRig, &tallRig}) {
+    r->engine.execute(cmd(notification ? CommandType::Notify : CommandType::SetPushedApp,
+                          notification ? "" : "band", payload));
+    if (!notification) r->engine.execute(switchFast("band"));
+    r->engine.tick(0);
+  }
+  float initial = 0;
+  for (int t : {0, 500, 2000}) {
+    shortRig.pipe->renderFrame(shortRig.canvas, t);
+    tallRig.pipe->renderFrame(tall, t);
+    if (t == 0) initial = tallRig.pipe->textX();
+    for (int y = 0; y < 11; ++y)
+      for (int x = 0; x < 53; ++x)
+        TEST_ASSERT_EQUAL_HEX32(y >= 1 && y < 9 ? shortRig.canvas.getPixel(x, y - 1) : 0,
+                                tall.getPixel(x, y));
+    TEST_ASSERT_EQUAL_HEX32(0xDEADBEEFu, guarded.front());
+    TEST_ASSERT_EQUAL_HEX32(0xDEADBEEFu, guarded.back());
+    TEST_ASSERT_EQUAL_HEX32(0xABCDEFu, tall.getPixel(0, 1));
+  }
+  if (notification) TEST_ASSERT_TRUE(tallRig.pipe->textX() < initial);
+}
+
+static void test_tall_text_and_icon_band() {
+  checkTallPage(false, "small");
+  checkTallPage(false, "large");
+}
+
+static void test_tall_scrolling_notification_band() {
+  checkTallPage(true, "small");
+  checkTallPage(true, "large");
+}
+
+// Without a zoom, a built-in app on a tall panel is its eight-row frame moved into the band.
+static void test_tall_builtin_app_draws_in_the_band() {
+  Rig shortRig(53, 8), tallRig(53, 11);
+  TimeApp shortTime, tallTime;
+  shortRig.apps.add(&shortTime);
+  tallRig.apps.add(&tallTime);
+  for (Rig* r : {&shortRig, &tallRig}) {
+    r->engine.execute(switchFast("Time"));
+    r->engine.tick(0);
+    r->pipe->renderFrame(r->canvas, 0);
+  }
+  TEST_ASSERT_TRUE(litColumns(shortRig.canvas) > 0);
+  for (int y = 0; y < 11; ++y)
+    for (int x = 0; x < 53; ++x)
+      TEST_ASSERT_EQUAL_HEX32(y >= 1 && y < 9 ? shortRig.canvas.getPixel(x, y - 1) : 0,
+                              tallRig.canvas.getPixel(x, y));
+}
+
 // Enlarges the stage onto the frame two to one, the way a 52x16 panel shows a 26x8 page.
 struct ScalingZoom : FakeZoom {
   ScalingZoom() : FakeZoom(26, 8) {}
@@ -1734,7 +1794,8 @@ static uint32_t frameHash(const Canvas& c) {
 // only for panels without one. The hashes were recorded from this test built against the
 // sources of 1f213bd (fb09bc5's render code), then checked unchanged with the band in place.
 static void test_zoom_path_frames_are_unchanged() {
-  static const uint32_t kExpected[] = {0u, 0u, 0u, 0u, 0u, 0u, 0u};
+  static const uint32_t kExpected[] = {0x8725b845u, 0xeaf68c95u, 0xbdf83bd5u, 0x65b120acu,
+                                       0xa26f9605u, 0xb3f130a2u, 0xe60b88fcu};
   ScalingZoom zoom;
   Rig r(52, 16, nullptr, &zoom);
   TimeApp timeApp;
@@ -1767,6 +1828,9 @@ static void test_zoom_path_frames_are_unchanged() {
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_zoom_path_frames_are_unchanged);
+  RUN_TEST(test_tall_text_and_icon_band);
+  RUN_TEST(test_tall_scrolling_notification_band);
+  RUN_TEST(test_tall_builtin_app_draws_in_the_band);
   RUN_TEST(test_icon_gap_sets_where_static_text_starts);
   RUN_TEST(test_scrolling_text_never_enters_a_wider_icon_gap);
   RUN_TEST(test_a_wide_icon_reserves_its_own_width_plus_the_gap);
