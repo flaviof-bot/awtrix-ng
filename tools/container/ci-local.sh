@@ -112,7 +112,12 @@ for step in "${steps[@]}"; do
             else
                 printf 'SKIP tag-check (not a v-tag event)\n'
             fi ;;
-        mkdocs) run_step mkdocs mkdocs_build ;;
+        mkdocs)
+            # docs.yml downloads this prerequisite from tc002-image-tools.yml.
+            # Build the same pinned assets locally; do not hide broken links to
+            # its generated sources, licenses and build manifest.
+            run_step docs-image-tools python tools/tc002/browser-image/build.py --work .pio/docs-image-tools --output docs/assets/tc002/image
+            run_step mkdocs mkdocs_build ;;
         build:*) run_step "$step" pio run -e "${step#build:}" ;;
     esac
 done

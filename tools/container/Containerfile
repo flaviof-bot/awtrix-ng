@@ -8,7 +8,7 @@ RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        build-essential cmake ninja-build zip git ca-certificates curl \
+        build-essential cmake ninja-build pkg-config zip git ca-certificates curl \
         python3 python3-venv libssl-dev liblzma-dev libjpeg-turbo8-dev openssl mosquitto squashfs-tools \
     && useradd --create-home ci \
     && rm -rf /var/lib/apt/lists/* \
