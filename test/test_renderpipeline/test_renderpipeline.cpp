@@ -1759,10 +1759,9 @@ static void test_zoom_path_frames_are_unchanged() {
   r.pipe->renderFrame(r.canvas, 3000);
   hashes.push_back(frameHash(r.canvas));
   TEST_ASSERT_EQUAL_INT(7, static_cast<int>(hashes.size()));
-  for (std::size_t i = 0; i < hashes.size(); ++i) {
+  for (std::size_t i = 0; i < hashes.size(); ++i)
     printf("zoom-identity frame %u: 0x%08xu\n", static_cast<unsigned>(i), static_cast<unsigned>(hashes[i]));
-    TEST_ASSERT_EQUAL_HEX32(kExpected[i], hashes[i]);
-  }
+  for (std::size_t i = 0; i < hashes.size(); ++i) TEST_ASSERT_EQUAL_HEX32(kExpected[i], hashes[i]);
 }
 
 int main(int, char**) {
