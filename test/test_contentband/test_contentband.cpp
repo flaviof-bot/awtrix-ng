@@ -62,6 +62,7 @@ static void test_builtin_modes_and_provisioning_use_band() {
   RenderCtx ctx;
   ctx.settings = &settings;
   ctx.runtime = &runtime;
+  ctx.fonts = &awtrixFontCatalog();
   ctx.hour = 12; ctx.minute = 34; ctx.second = 56;
   ctx.mday = 23; ctx.month = 9; ctx.year = 2026; ctx.weekday = 3;
   TimeApp time;
@@ -77,10 +78,10 @@ static void test_builtin_modes_and_provisioning_use_band() {
                         static_cast<IApp*>(&temp), static_cast<IApp*>(&humidity),
                         static_cast<IApp*>(&battery)}) {
         Canvas small(53, 8), tall(53, height);
-        for (FontId id : {FontId::Small, FontId::Large}) {
+        for (const char* name : {"small", "large"}) {
           small.clear();
           tall.clear();
-          ctx.font = &awtrixFont(id);
+          ctx.font = awtrixFontCatalog().find(name)->font;
           app->render(small, ctx);
           app->render(tall, ctx);
           assertShifted(small, tall);
