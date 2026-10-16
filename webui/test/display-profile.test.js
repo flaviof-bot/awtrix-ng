@@ -136,9 +136,9 @@ async function testPanelHeight() {
     display:{width:53,height:11,configurable:true,minWidth:32,maxWidth:128,minHeight:8,maxHeight:16,maxPixels:2048}}});
   await goto(window,'#/system');
   const panel=window.document.querySelector('#sec-panel');
-  const input=panel.querySelector('[name="panelHeight"]');
+  const input=[...panel.querySelectorAll('input[type=number]')].find(i=>i.min==='8'&&i.max==='16');
+  assert(panel.textContent.includes('Panel height')&&input,'panel height field is limited to 8-16 rows');
   assert(input&&input.value==='11','panel height field shows the stored height');
-  assert(input&&input.min==='8'&&input.max==='16','panel height field is limited to 8-16 rows');
   assert(panel.textContent.includes('53 × 11 = 583'),'panel summary uses the configured height');
   window.close();
 }
