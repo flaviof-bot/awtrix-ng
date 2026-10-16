@@ -72,6 +72,17 @@ tag_check() {
         grep -q "releases/$version.md" mkdocs.yml
 }
 
+# Linux permission/TLS contracts deliberately reject uid 0, like upstream's
+# unprivileged Actions runner. Only CTest output needs write access to the build.
+linux_tests() {
+    if (( EUID == 0 )); then
+        chown -R ci:ci .pio/linux &&
+            runuser -u ci -- ctest --test-dir .pio/linux --output-on-failure --no-tests=error
+    else
+        ctest --test-dir .pio/linux --output-on-failure --no-tests=error
+    fi
+}
+
 for step in "${steps[@]}"; do
     case "$step" in
         native) run_step native python scripts/test_native.py ;;
@@ -79,7 +90,7 @@ for step in "${steps[@]}"; do
             run_step linux-libraries pio pkg install -e native
             run_step linux-configure cmake -S . -B .pio/linux -DCMAKE_BUILD_TYPE=Release -DAWTRIX_REQUIRE_INTEGRATION_SERVICES=ON
             run_step linux-build cmake --build .pio/linux --parallel 2
-            run_step linux ctest --test-dir .pio/linux --output-on-failure --no-tests=error
+            run_step linux linux_tests
             printf 'SKIP linux-service (needs systemd; covered by GitHub CI)\n' ;;
         webui)
             run_step webui webui_tests
