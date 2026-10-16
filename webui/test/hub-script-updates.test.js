@@ -1,4 +1,4 @@
-const { boot, goto, flush } = require('./harness');
+const { boot, goto, flush, until } = require('./harness');
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const id = 'ZGAjqmr8hFKN';
@@ -108,7 +108,8 @@ async function tokenRequiredScenario() {
       .find(button => button.textContent === 'Connect to Hub');
     assert.ok(connect, 'the blocked update points to Hub settings');
     connect.click();
-    await flush(80);
+    assert.ok(await until(() => window.document.activeElement?.matches?.('#sec-hub input[type=password]')),
+      'Hub password field receives focus after navigation');
     assert.equal(window.location.hash, '#/system');
     assert.equal(window.document.activeElement, window.document.querySelector('#sec-hub input[type=password]'));
   } finally { window.close(); }

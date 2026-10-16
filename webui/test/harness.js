@@ -61,6 +61,17 @@ async function flush(ms = 40) {
   }
 }
 
+// Wait for observable completion, not an assumed fetch/render duration.
+async function until(cond, { timeout = 3000, step = 10 } = {}) {
+  if (!(timeout >= 0) || !(step > 0)) throw new RangeError('invalid wait interval');
+  const end = Date.now() + timeout;
+  while (!cond()) {
+    if (Date.now() >= end) return false;
+    await flush(step);
+  }
+  return true;
+}
+
 // ---- in-memory backend ----------------------------------------------------
 function makeStore() {
   const scripts = new Map(); // name -> source
@@ -542,4 +553,4 @@ function stubXhr(window, log, store) {
   };
 }
 
-module.exports = { boot, bootLive, goto, flush, stubXhr, putSound, useFakeTimers };
+module.exports = { boot, bootLive, goto, flush, until, stubXhr, putSound, useFakeTimers };

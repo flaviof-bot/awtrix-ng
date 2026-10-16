@@ -2,7 +2,7 @@
    The catalogue lives outside the device - the browser fetches the manifest and
    the GIF bytes itself and only the install writes to the clock - so everything
    here is driven through the mocked external endpoints in the harness. */
-const { boot, goto, flush, stubXhr } = require('./harness');
+const { boot, goto, flush, until, stubXhr } = require('./harness');
 
 let pass = 0, fail = 0;
 function assert(cond, msg) {
@@ -91,7 +91,7 @@ async function testDeviceToken() {
     'without a token nothing is sent as authorization');
 
   await goto(window, '#/system');
-  await flush(80);
+  await until(() => window.document.querySelector('#sec-hub input[type=password]'));
   const field = window.document.querySelector('#sec-hub input[type=password]');
   assert(!!field, 'the System tab carries the token field');
   field.value = '  tok_abc123  ';
