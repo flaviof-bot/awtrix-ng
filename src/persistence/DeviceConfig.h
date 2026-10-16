@@ -47,6 +47,7 @@ struct DeviceConfig : PlatformConfig {
   bool ldrOnGround = false;
   long brightnessSmoothing = 10000;
   int panelWidth = 32;
+  int panelHeight = kMatrixHeight;
   int panels = 1;
   mutable bool persistencePending = false;
   PanelStart panelStart = PanelStart::TopLeft;
@@ -97,6 +98,7 @@ struct DeviceConfig : PlatformConfig {
   MatrixLayout matrixLayout() const {
     MatrixLayout l;
     l.panelWidth = panelWidth;
+    l.panelHeight = panelHeight;
     l.panels = panels;
     l.panelStart = panelStart;
     l.panelWiring = panelWiring;

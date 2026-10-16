@@ -120,7 +120,7 @@ function applyGpioCaps(c){
 const PINKEYS=['pinMatrix','pinBtnLeft','pinBtnSelect','pinBtnRight','pinBattery','pinLdr',
   'pinBuzzer','pinI2cSda','pinI2cScl','pinDfRx','pinDfTx','pinI2sBclk','pinI2sLrclk','pinI2sDout',
   'pinI2sMclk','pinAmpEnable'];
-const REBOOT_KEYS=new Set(['wifiSsid','wifiPass','netStatic','ip','gateway','subnet','dns1','dns2',
+const REBOOT_KEYS=new Set(['panelHeight','wifiSsid','wifiPass','netStatic','ip','gateway','subnet','dns1','dns2',
   'wifiConnectTimeout','hostname','webPort','mqttEnabled','mqttHost','mqttPort','mqttUser',
   'mqttPass','mqttPrefix','statsInterval','dfplayer','scriptingEnabled'].concat(PINKEYS));
 //linux:begin
@@ -152,8 +152,9 @@ function paintPanelSize(fields,out){
   const pw=Number(fields.panelWidth.get()),n=Number(fields.panels.get()),w=pw*n,d=S.display||{};
   const bad=(w<(d.minWidth||32)||w>(d.maxWidth||128))?t('pnBadWidth'):'';
   out.className='badge '+(bad?'bad':'good');
-  out.replaceChildren(bad||w+' × 8 = '+(w*8)+' '+t('pnLeds')+' · '+
-    (n>1?n+' '+t('pnPanelsOf')+' '+pw+' × 8':t('pnOne')));
+  const h=fields.panelHeight?Number(fields.panelHeight.get())||8:8;
+  out.replaceChildren(bad||w+' × '+h+' = '+(w*h)+' '+t('pnLeds')+' · '+
+    (n>1?n+' '+t('pnPanelsOf')+' '+pw+' × '+h:t('pnOne')));
   if(d.restartRequired)out.append(el('div',null,
     'Active: '+d.width+' × '+d.height+' · '+t('rebootreq')));
 }

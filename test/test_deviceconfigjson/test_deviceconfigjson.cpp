@@ -40,6 +40,7 @@ DeviceConfig seeded() {
   c.hostname = "awtrix";
   c.pinMatrix = 21;
   c.panelWidth = 8;
+  c.panelHeight = 11;
   c.panels = 4;
   c.panelStart = PanelStart::BottomRight;
   c.panelWiring = Wiring::Columns;
@@ -63,7 +64,7 @@ void changesNothing(const char* json) {
 
 static void test_reply_exposes_configurable_panel_fields() {
   TEST_ASSERT_TRUE(written(seeded(), false).find("\"panels\":4") != std::string::npos);
-  TEST_ASSERT_TRUE(written(seeded(), false).find("panelHeight") == std::string::npos);
+  TEST_ASSERT_TRUE(written(seeded(), false).find("\"panelHeight\":11") != std::string::npos);
 }
 
 static void test_secrets_are_omitted_unless_asked_for() {
@@ -159,6 +160,12 @@ static void test_the_whole_table_round_trips() {
   DeviceConfig back;
   back.applyRead(api::JsonReader(written(src, true)));
   TEST_ASSERT_EQUAL_STRING(dump(src).c_str(), dump(back).c_str());
+  TEST_ASSERT_EQUAL_INT(11, back.panelHeight);
+  TEST_ASSERT_EQUAL_INT(11, back.matrixLayout().height());
+  DeviceConfig legacy;
+  legacy.applyRead(api::JsonReader(R"({"panelWidth":53})"));
+  TEST_ASSERT_EQUAL_INT(8, legacy.panelHeight);
+  TEST_ASSERT_EQUAL_INT(16, after(R"({"panelHeight":16})").panelHeight);
 }
 
 int main(int, char**) {

@@ -86,22 +86,25 @@ void test_width_updates_stay_within_one_row_of_panels_without_partial_applicatio
   TEST_ASSERT_EQUAL_INT(kMatrixHeight, config.matrixLayout().height());
 }
 
-void test_a_panel_height_is_no_setting() {
+void test_a_panel_height_is_a_panel_setting() {
   DeviceConfig config;
   int commits = 0;
   auto commit = [&] { ++commits; return true; };
   auto result = api::systemConfigRequest("PUT", R"({"panelHeight":16,"hostname":"kitchen"})", false, config, commit);
   TEST_ASSERT_EQUAL_INT(200, result.status);
   TEST_ASSERT_EQUAL_STRING("kitchen", config.hostname.c_str());
-  TEST_ASSERT_EQUAL_INT(kMatrixHeight, config.matrixLayout().height());
+  TEST_ASSERT_EQUAL_INT(16, config.matrixLayout().height());
   result = api::systemConfigRequest("GET", "", false, config, commit);
-  TEST_ASSERT_TRUE(result.body.find("panelHeight") == std::string::npos);
+  TEST_ASSERT_TRUE(result.body.find("\"panelHeight\":16") != std::string::npos);
+  result = api::systemConfigRequest("PUT", R"({"panelHeight":17})", false, config, commit);
+  TEST_ASSERT_EQUAL_INT(422, result.status);
+  TEST_ASSERT_EQUAL_INT(16, config.panelHeight);
   int applied = 0;
   sysconfig::ApplyError error;
-  TEST_ASSERT_TRUE(sysconfig::apply(config, api::JsonReader(R"({"panelWidth":16,"panels":4,"panelHeight":32})"),
+  TEST_ASSERT_TRUE(sysconfig::apply(config, api::JsonReader(R"({"panelWidth":16,"panels":4,"panelHeight":11})"),
       applied, error, sysconfig::Origin::Restore));
   TEST_ASSERT_EQUAL_INT(64, config.matrixLayout().width());
-  TEST_ASSERT_EQUAL_INT(kMatrixHeight, config.matrixLayout().height());
+  TEST_ASSERT_EQUAL_INT(11, config.matrixLayout().height());
 }
 
 DeviceConfig fixedDisplayConfig() {
@@ -196,7 +199,7 @@ int main() {
   RUN_TEST(test_pending_storage_is_reported_without_losing_live_configuration);
   RUN_TEST(test_nonobject_update_is_rejected_without_persistence);
   RUN_TEST(test_width_updates_stay_within_one_row_of_panels_without_partial_application);
-  RUN_TEST(test_a_panel_height_is_no_setting);
+  RUN_TEST(test_a_panel_height_is_a_panel_setting);
   RUN_TEST(test_configurable_platform_lists_panel_and_pin_fields);
   RUN_TEST(test_fixed_display_saves_without_panel_or_pin_fields);
   RUN_TEST(test_fixed_display_restores_a_panel_backup_without_its_geometry_or_pins);

@@ -17,7 +17,8 @@ Esp32Board::Esp32Board(const DeviceConfig& cfg) {
     pinsWereInvalid_ = true;
   }
   layout_ = cfg.matrixLayout();
-  layoutWasInvalid_ = layout_.panelWidth != cfg.panelWidth || layout_.panels != cfg.panels;
+  layoutWasInvalid_ = layout_.panelWidth != cfg.panelWidth || layout_.panels != cfg.panels ||
+                      layout_.panelHeight != cfg.panelHeight;
   buzzer_.setPin(pins_.buzzer);
   dfplayer_.setPins(pins_.dfRx, pins_.dfTx);
   dfplayerWired_ = pins_.dfplayerEnabled && pins_.dfRx >= 0 && pins_.dfTx >= 0;

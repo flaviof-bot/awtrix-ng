@@ -38,6 +38,7 @@ const SYSF={
    {derive:v=>({tz:TZRULE.get(v)||'UTC0'})}),
  tz:F('hidden','text','Timezone rule',''),
  panelWidth:F('panel','number','Panel width','Pixels across one panel.',{min:1,max:128,unit:'px'}),
+ panelHeight:F('panel','number','Panel height','Pixels high; requires a reboot.',{min:8,max:16,unit:'px'}),
  panels:F('panel','number','Panels','How many panels are chained.',{min:1,max:128}),
  panelStart:F('panel','select','First LED','Corner the data cable arrives at.',{opt:[
    ['topLeft','Top left'],['topRight','Top right'],

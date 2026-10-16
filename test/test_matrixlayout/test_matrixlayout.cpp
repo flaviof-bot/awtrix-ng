@@ -25,7 +25,7 @@ int refTileFromRight(int cx, int cy) {
   return cy * 8 + (7 - ((cy & 1) ? (7 - cx) : cx));
 }
 
-constexpr int kMaxLeds = kMatrixWidthMax * kMatrixHeight;
+constexpr int kMaxLeds = kMatrixWidthMax * kMatrixHeightMax;
 
 struct Grid {
   int panelWidth;
@@ -369,7 +369,15 @@ static void test_all_chain_combinations_are_bijections() {
               layout.panelSerpentine = panelSerp != 0;
               layout.panelChainReverse = reverse != 0;
               layout.panelChainSerpentine = chainSerp != 0;
-              assertBijection(layout);
+              for (int height : {8, 11, 16}) {
+                layout.panelHeight = height;
+                TEST_ASSERT_EQUAL_INT(layout.width() * height, layout.ledCount());
+                for (int transform = 0; transform < 4; ++transform) {
+                  layout.mirror = (transform & 1) != 0;
+                  layout.rotate180 = (transform & 2) != 0;
+                  assertBijection(layout);
+                }
+              }
             }
           }
         }
@@ -396,12 +404,45 @@ static void test_every_layout_is_eight_high() {
   TEST_ASSERT_EQUAL_INT(8, tiles8x8().height());
 }
 
+static void test_runtime_height_mapping_and_sanitization() {
+  for (int h : {8, 11, 16}) {
+    MatrixLayout layout;
+    layout.panelWidth = 53;
+    layout.panelHeight = h;
+    bool changed = true;
+    TEST_ASSERT_EQUAL_INT(h, sanitizeMatrixLayout(layout, &changed).height());
+    TEST_ASSERT_FALSE(changed);
+    for (int y = 0; y < h; ++y)
+      for (int x = 0; x < 53; ++x)
+        TEST_ASSERT_EQUAL_INT(refUlanzi(x, y, 53), layout.xyToIndex(x, y));
+    layout.panelWiring = Wiring::Columns;
+    for (int y = 0; y < h; ++y)
+      for (int x = 0; x < 53; ++x)
+        TEST_ASSERT_EQUAL_INT(refColumns(x, y, h), layout.xyToIndex(x, y));
+  }
+  for (int h : {-1, 7, 17, 100}) {
+    MatrixLayout layout;
+    layout.panelHeight = h;
+    bool changed = false;
+    TEST_ASSERT_EQUAL_INT(h < 8 ? 8 : 16, sanitizeMatrixLayout(layout, &changed).height());
+    TEST_ASSERT_TRUE(changed);
+  }
+  // A width outside the envelope falls back to the stock width but keeps a valid height.
+  MatrixLayout tooWide;
+  tooWide.panelWidth = 128;
+  tooWide.panels = 2;
+  tooWide.panelHeight = 11;
+  const MatrixLayout fallback = sanitizeMatrixLayout(tooWide, nullptr);
+  TEST_ASSERT_EQUAL_INT(32, fallback.width());
+  TEST_ASSERT_EQUAL_INT(11, fallback.height());
+}
+
 static void test_the_widest_chain_is_128_by_8() {
   TEST_ASSERT_EQUAL_INT(32, kEspDisplayLimits.minWidth);
   TEST_ASSERT_EQUAL_INT(128, kEspDisplayLimits.maxWidth);
   TEST_ASSERT_EQUAL_INT(8, kEspDisplayLimits.minHeight);
-  TEST_ASSERT_EQUAL_INT(8, kEspDisplayLimits.maxHeight);
-  TEST_ASSERT_EQUAL_UINT32(1024u, static_cast<uint32_t>(kEspDisplayLimits.maxPixels));
+  TEST_ASSERT_EQUAL_INT(16, kEspDisplayLimits.maxHeight);
+  TEST_ASSERT_EQUAL_UINT32(2048u, static_cast<uint32_t>(kEspDisplayLimits.maxPixels));
 
   MatrixLayout layout;
   layout.panelWidth = 64;
@@ -494,6 +535,7 @@ int main(int, char**) {
   RUN_TEST(test_all_chain_combinations_are_bijections);
   RUN_TEST(test_sanitize_keeps_a_valid_layout);
   RUN_TEST(test_every_layout_is_eight_high);
+  RUN_TEST(test_runtime_height_mapping_and_sanitization);
   RUN_TEST(test_the_widest_chain_is_128_by_8);
   RUN_TEST(test_sanitize_rejects_a_width_outside_the_envelope);
   RUN_TEST(test_sanitize_clamps_nonsense_fields);

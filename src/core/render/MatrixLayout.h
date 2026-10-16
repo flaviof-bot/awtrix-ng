@@ -9,20 +9,24 @@
 
 namespace awtrix {
 
-inline constexpr int kMatrixHeight = 8;
+inline constexpr int kMatrixHeightMin = 8;
+inline constexpr int kMatrixHeightMax = 16;
+// The default panel height, and the one every layout had before panelHeight existed.
+inline constexpr int kMatrixHeight = kMatrixHeightMin;
 inline constexpr int kMatrixWidthMin = 32;
 inline constexpr int kMatrixWidthMax = 128;
 
-// What an ESP32 build drives: one row of panels, 8 pixels high and 32 to 128 wide.
+// What an ESP32 build drives: one row of panels, 8 to 16 pixels high and 32 to 128 wide.
 inline constexpr DisplayLimits kEspDisplayLimits{
-    kMatrixWidthMin, kMatrixWidthMax, kMatrixHeight, kMatrixHeight,
-    static_cast<std::size_t>(kMatrixWidthMax) * kMatrixHeight};
+    kMatrixWidthMin, kMatrixWidthMax, kMatrixHeightMin, kMatrixHeightMax,
+    static_cast<std::size_t>(kMatrixWidthMax) * kMatrixHeightMax};
 
 // The width a row of `panels` panels, each `panelWidth` wide, gives, or 0 outside the envelope.
-// Overflow-safe for any stored value.
+// Overflow-safe for any stored value. Every supported height fits the pixel budget at any
+// supported width, so the width alone decides.
 inline constexpr int espMatrixWidth(int panelWidth, int panels) {
   return panelWidth > 0 && panels > 0 && panelWidth <= kEspDisplayLimits.maxWidth / panels &&
-                 kEspDisplayLimits.accepts(panelWidth * panels, kMatrixHeight)
+                 kEspDisplayLimits.accepts(panelWidth * panels, kMatrixHeightMax)
              ? panelWidth * panels
              : 0;
 }
@@ -53,6 +57,7 @@ inline std::string enumNameChoices(const char* const* names, int count) {
 
 struct MatrixLayout {
   int panelWidth = 32;
+  int panelHeight = kMatrixHeight;
   int panels = 1;
   PanelStart panelStart = PanelStart::TopLeft;
   Wiring panelWiring = Wiring::Rows;
@@ -64,7 +69,7 @@ struct MatrixLayout {
   bool rotate180 = false;
 
   int width() const { return panelWidth * panels; }
-  int height() const { return kMatrixHeight; }
+  int height() const { return panelHeight; }
   int ledCount() const { return width() * height(); }
 
   bool bottomStart() const {

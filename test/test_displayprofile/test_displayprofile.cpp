@@ -171,9 +171,9 @@ static void test_capabilities_separate_pending_width_and_the_esp_envelope() {
   TEST_ASSERT_TRUE(api::memberValue(display, "restartRequired").asBool(pending));
   TEST_ASSERT_TRUE(pending);
   TEST_ASSERT_TRUE(api::memberValue(display, "maxHeight").asLong(value));
-  TEST_ASSERT_EQUAL_INT(8, value);
+  TEST_ASSERT_EQUAL_INT(16, value);
   TEST_ASSERT_TRUE(api::memberValue(display, "maxPixels").asLong(value));
-  TEST_ASSERT_EQUAL_INT(1024, value);
+  TEST_ASSERT_EQUAL_INT(2048, value);
   TEST_ASSERT_TRUE(api::memberValue(display, "estimatedWireTimeUs").asLong(value));
   TEST_ASSERT_EQUAL_INT(7680, value);
 }

@@ -128,7 +128,18 @@ async function testPendingWidth() {
   assert(panel.textContent.includes('64 × 8 = 512'),'panel summary shows the configured width at 8 rows');
   assert(panel.textContent.includes('8 panels of 8 × 8'),'panel summary names the chained panels');
   assert(panel.textContent.includes('32 × 8'),'pending panel size keeps active dimensions visible');
-  assert(!panel.querySelector('[name="panelHeight"]')&&!panel.textContent.includes('Panel height'),'no panel height field');
+  window.close();
+}
+
+async function testPanelHeight() {
+  const {window}=await boot({canvasContext:context(),system:{...system,panelWidth:53,panels:1,panelHeight:11},caps:{transitions:[],audio,
+    display:{width:53,height:11,configurable:true,minWidth:32,maxWidth:128,minHeight:8,maxHeight:16,maxPixels:2048}}});
+  await goto(window,'#/system');
+  const panel=window.document.querySelector('#sec-panel');
+  const input=panel.querySelector('[name="panelHeight"]');
+  assert(input&&input.value==='11','panel height field shows the stored height');
+  assert(input&&input.min==='8'&&input.max==='16','panel height field is limited to 8-16 rows');
+  assert(panel.textContent.includes('53 × 11 = 583'),'panel summary uses the configured height');
   window.close();
 }
 
@@ -138,6 +149,7 @@ async function main() {
   await testFrameDimensionsOverrideCapabilities();
   await testNativeEditorAndImport();
   await testPendingWidth();
+  await testPanelHeight();
   await flush(20);
   console.log(`display-profile: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
