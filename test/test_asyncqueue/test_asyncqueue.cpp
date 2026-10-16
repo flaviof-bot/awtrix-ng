@@ -2,6 +2,7 @@
 #include <unity.h>
 
 #include <atomic>
+#include <chrono>
 #include <set>
 #include <string>
 #include <thread>
@@ -81,20 +82,27 @@ static void test_concurrent_producers_do_not_corrupt_the_queue() {
   script::AsyncQueue<script::HttpResult, 8> q;
 
   std::atomic<bool> done{false};
+  std::atomic<int> popped{0};
+  std::atomic<bool> timedOut{false};
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
   std::vector<script::HttpResult> got;
   got.reserve(kProducers * kPerProducer);
 
   std::thread consumer([&] {
     script::HttpResult out;
     while (!done.load(std::memory_order_acquire)) {
-      while (q.pop(out)) got.push_back(out);
+      while (q.pop(out)) {
+        got.push_back(out);
+        popped.fetch_add(1, std::memory_order_release);
+      }
+      std::this_thread::yield();
     }
     while (q.pop(out)) got.push_back(out);
   });
 
   std::vector<std::thread> producers;
   for (int p = 0; p < kProducers; ++p) {
-    producers.emplace_back([&q, p] {
+    producers.emplace_back([&, p] {
       for (int i = 0; i < kPerProducer; ++i) {
         script::HttpResult r;
         r.id = static_cast<uint32_t>(p * kPerProducer + i);
@@ -102,12 +110,25 @@ static void test_concurrent_producers_do_not_corrupt_the_queue() {
         r.body = std::string("producer-") + std::to_string(p) + "-item-" +
                  std::to_string(i) + std::string(64, 'x');
         q.push(std::move(r));
+        // Four acknowledged batches of four cannot overflow the eight-slot
+        // queue. This guarantees >8 observations even if producers otherwise
+        // finish before the consumer runs; the remaining pushes still race.
+        if (i < 4) {
+          while (popped.load(std::memory_order_acquire) < (i + 1) * kProducers) {
+            if (std::chrono::steady_clock::now() >= deadline) {
+              timedOut.store(true, std::memory_order_relaxed);
+              return;
+            }
+            std::this_thread::yield();
+          }
+        }
       }
     });
   }
   for (auto& t : producers) t.join();
   done.store(true, std::memory_order_release);
   consumer.join();
+  TEST_ASSERT_FALSE_MESSAGE(timedOut.load(), "consumer did not acknowledge bounded batches before deadline");
 
   std::set<uint32_t> seen;
   for (const auto& r : got) {
