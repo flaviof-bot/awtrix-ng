@@ -1,0 +1,20 @@
+FROM docker.io/library/node:24-bookworm AS node
+FROM docker.io/library/python:3.12-bookworm
+
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY requirements-docs.txt /tmp/requirements-docs.txt
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends build-essential cmake ninja-build zip \
+        libssl-dev liblzma-dev libjpeg62-turbo-dev openssl mosquitto \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir platformio pyyaml esptool -r /tmp/requirements-docs.txt
+
+# Build with the repository root as context; Debian's JPEG package is the
+# equivalent of Ubuntu's libjpeg-turbo8-dev in the linux-tests job.
+ENV PLATFORMIO_CORE_DIR=/root/.platformio
+VOLUME /root/.platformio
+WORKDIR /w
+CMD ["bash"]

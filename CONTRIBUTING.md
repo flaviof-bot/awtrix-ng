@@ -78,6 +78,32 @@ CI also configures and builds the Linux targets, runs their CTest suite and
 checks service isolation. Use the commands in the
 [developer build guide](docs/developers/building.md) on a Linux host.
 
+### Local CI container
+
+To run the host tests, Linux contracts, web UI, documentation checks and three
+ESP32 builds without installing a toolchain, use the CI image:
+
+```bash
+podman build -f tools/container/Containerfile -t localhost/awtrix-build:ng122 .
+podman run --rm --cpus 4 --memory 12g -v "$PWD":/w:Z \
+    -v pio-home-ng122:/root/.platformio \
+    localhost/awtrix-build:ng122 tools/container/ci-local.sh all
+```
+
+The CPU limit leaves room for other builds on a shared host. The volume caches
+PlatformIO downloads. The image includes Node 24, Linux integration dependencies
+and the pinned documentation requirements. Rebuild it when requirements change.
+
+The runner validates every argument before starting and reports PASS/FAIL for
+all steps, continuing after failures. Run groups separately with `native`,
+`linux`, `webui`, `docs`, `mkdocs` (the per-clock site build), or `build ENV...`.
+The actual systemd service test is explicitly skipped in this container and
+remains a GitHub CI gate. Tag checks run only with a `refs/tags/v*` GITHUB_REF
+and matching GITHUB_REF_NAME. Release publishing and TC002 image/installer
+workflows are not part of this local runner. USB install image generation is
+optional: `python scripts/factory_image.py --env awtrix --all -o dist` (repeat
+for each S3 environment after building it).
+
 ### Documentation per clock
 
 The site is built once per clock (`esp32`, `esp32-s3`, `tc002`) from one source
