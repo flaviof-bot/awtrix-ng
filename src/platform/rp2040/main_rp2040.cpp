@@ -34,6 +34,7 @@
 #include "platform/rp2040/Rp2040Profile.h"
 #include "platform/rp2040/TimeService.h"
 #include "system/Log.h"
+#include "system/Watchdog.h"
 #include "system/GalacticUnicornControls.h"
 #include "transport/net/ArtnetService.h"
 #include "transport/net/DiscoveryService.h"
@@ -72,6 +73,7 @@ class PicoSystem final : public ISystemService {
   }
   // A reset removes the namespace files and reboots without saving over them.
   void factoryReset() override {
+    watchdog::stop();
     LittleFS.remove("/NVS/awtrix-cfg.bin");
     resetSettings();
   }
@@ -89,7 +91,10 @@ class PicoSystem final : public ISystemService {
       WiFi.aggressiveLowPowerMode();
       const auto pressed = [] { return !gpio_get(galactic::Sleep); };
       PicoSleep sleeper(monotonicMs(), sleepMs, pressed());
-      while (!sleeper.wake(monotonicMs(), pressed())) delay(10);
+      while (!sleeper.wake(monotonicMs(), pressed())) {
+        watchdog::feed();
+        delay(10);
+      }
     }
     rp2040.reboot();
     for (;;) {}
@@ -228,6 +233,7 @@ void setup() {
                 g_board->matrixHeight());
   const int64_t bootT0 = monotonicMs();
   auto showBootLogo = [bootT0] {
+    watchdog::feed();
     render::drawBootLogo(g_runtime->canvas(), awtrixFont(), bootT0, monotonicMs());
     g_board->show(g_runtime->canvas());
   };
@@ -235,6 +241,7 @@ void setup() {
   const bool forceAp = holdingSelectAtBoot();
   // The radio takes its PIO state machine only now, after the panel owns its PIO and DMA.
   platform::beginRadio();
+  watchdog::begin(); // filesystem mount and radio startup are complete
   // Joining a network from the provisioning AP reboots, so setup reruns with an address.
   g_net.setOnJoinedFromAp([] { g_system.reboot(); });
   g_net.begin(g_cfg, g_runtime->engine().state().runtime().wifi, forceAp, showBootLogo);
@@ -272,6 +279,7 @@ void setup() {
 }
 
 void loop() {
+  watchdog::feed();
   const int64_t now = monotonicMs();
   auto& unicorn = static_cast<GalacticUnicornBoard&>(*g_board);
   g_controls.tick(g_runtime->engine(), unicorn.readInputs(), now);

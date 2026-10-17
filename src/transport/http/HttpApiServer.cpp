@@ -66,6 +66,8 @@
 #include "system/HeapProbe.h"
 #include "transport/http/UpdateImage.h"
 #include "system/Log.h"
+#include "system/Watchdog.h"
+#include "transport/http/RequestHead.h"
 #include "transport/DeviceStateJson.h"
 #include "transport/http/WebUiAsset.h"
 
@@ -145,6 +147,7 @@ class HttpApiServer::UploadHandler : public RequestHandler {
   bool canRaw(HttpServerBase&, String uri) override { return canRaw(uri); }
 #endif
   void raw(HttpServerBase& server, String, HTTPRaw& raw) override {
+    watchdog::feed();
     // These routes require multipart files; other bodies are discarded in WebServer's raw buffer.
     if (raw.status == RAW_START)
       static_cast<RawWebServer&>(server).setRawReadTimeout(kRawBodyIdleTimeoutMs);
@@ -216,6 +219,7 @@ void HttpApiServer::dropRawBody() {
 // Called by WebServer for every raw-body chunk. Script sources use a second arena that is
 // allocated at RAW_START and released again on completion, since it dwarfs the fixed body arena.
 void HttpApiServer::collectBody(HttpServerBase& server, const String& uri, HTTPRaw& raw) {
+  watchdog::feed();
   const std::string method = methodName(server.method());
   const std::string path = uri.c_str();
   const bool rawSource = api::isRawBodyWrite(method, path);

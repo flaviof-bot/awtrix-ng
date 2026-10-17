@@ -175,6 +175,24 @@ brownout → `brownout` when distinguishable, otherwise `unknown`. ESP32 values
 are unchanged. Pico boot logs (`reset: ...`) and `/api/v1/device` report this
 reason.
 
+The RP2040 hardware watchdog is armed once the radio is up, with its ~8 s maximum. A Pico that
+hangs or hard-faults reboots itself after about 8 seconds, like an ESP32 after a panic, and
+`/api/v1/device` then reports `resetReason: "watchdog"`. The reason is read once at boot, before
+the watchdog is armed, so a requested reboot or a flash still reads `software`. Boot's Wi-Fi join,
+sleep and the HTTP server feed it while they wait:
+
+- a request is parsed only once its header, and a body of up to 2 KB, has fully arrived; a client
+  that has not sent them within 5 s is dropped, and a header over 2 KB is answered
+  `431 Request Header Fields Too Large` and the connection is closed;
+- larger bodies (uploads, restores and script sources, refused ones included) feed it as each
+  piece arrives;
+- every response is written only as fast as the client takes it; a client that takes nothing for
+  5 s is given up on and its connection closed.
+
+A body over 2 KB sent slower than about 180 bytes per second can still hold the device past the
+watchdog, which then restarts it; ordinary slow networks are far faster. A factory reset disarms
+the watchdog before it removes the settings files.
+
 The Pico has **no ESP32-style deep sleep with GPIO wake**; `POST
 /api/v1/device/sleep` is **emulated**. Like a reboot it runs after the display
 power animation. Sleep then blanks the panel, enables CYW43 aggressive power

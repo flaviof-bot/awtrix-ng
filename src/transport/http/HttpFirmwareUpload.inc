@@ -25,6 +25,7 @@ void HttpApiServer::scanImageMarker(const uint8_t* buf, size_t len) {
 }
 
 void HttpApiServer::handleUpdateUpload() {
+  watchdog::feed();
   if constexpr (!buildcfg::buildFeatures().browserOta) return;
   HTTPUpload& up = server_->upload();
   if (up.status == UPLOAD_FILE_START) {
@@ -130,7 +131,7 @@ void HttpApiServer::handleUpdateDone() {
 #else
 // A build without browser update (the Pico) takes a UF2 over USB instead. Every way of reaching
 // /update ends here, so it has one answer.
-void HttpApiServer::handleUpdateUpload() {}
+void HttpApiServer::handleUpdateUpload() { watchdog::feed(); }
 void HttpApiServer::handleUpdateDone() {
   addCorsHeaders("POST", "/update");
   sendError(503, "unavailable", "browser update is unavailable; flash a UF2 over USB (BOOTSEL)");

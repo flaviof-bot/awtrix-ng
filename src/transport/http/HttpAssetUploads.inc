@@ -58,6 +58,7 @@ api::HttpResult HttpApiServer::multipartPolicy() {
 }
 
 void HttpApiServer::handleFileUpload() {
+  watchdog::feed();
   if constexpr (!buildcfg::buildFeatures().all()) {
     if (api::featurePolicy(buildcfg::buildFeatures(), server_->uri().c_str()) ==
         DispatchResult::Unavailable) return;
@@ -119,6 +120,7 @@ void HttpApiServer::cleanupRestore() {
 
 // Feed the actual ZIP reader while the request streams; no complete backup is buffered.
 void HttpApiServer::handleRestoreUpload() {
+  watchdog::feed();
   HTTPUpload& upload = server_->upload();
   if (upload.status == UPLOAD_FILE_START) {
     if (!restoreRequest_.start(multipartPolicy())) {
