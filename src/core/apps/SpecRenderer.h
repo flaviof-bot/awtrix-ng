@@ -19,6 +19,9 @@ struct SpecRender {
   int iconGap = 0;
   // First column scrolling text may light; everything left of it belongs to the icon and its gap.
   int textClipLeft = 0;
+  // Draw the text in the eight-row content band (render::contentBand), clipped to it, with an
+  // eight-row baseline. Set where the platform has no page zoom; see RenderPipeline.
+  bool textBand = false;
   int baseline = kTextBaseline;
   // Text inside draw commands keeps the eight-row line, since their y is absolute.
   int drawBaseline = kTextBaseline;

@@ -236,8 +236,8 @@ void RenderPipeline::renderPage(Canvas& dst, const std::string& id, int64_t nowM
     // Without a page zoom, page text sits in the eight-row content band, on the same rows as the
     // icon and the built-in apps. With one (TC002) the line box stays centred on the canvas.
     const bool band = !d_.zoom || !d_.zoom->available();
-    r.baseline = band ? pageBaseline(font) + render::contentBandTop(page.height())
-                      : pageBaseline(font, page.height());
+    r.textBand = band;
+    r.baseline = band ? pageBaseline(font) : pageBaseline(font, page.height());
     r.drawBaseline = pageBaseline(font);
     r.backgroundDrawn = fullScreen;
     r.nowMs = nowMs;
