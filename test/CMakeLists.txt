@@ -59,6 +59,7 @@ foreach(TEST_DIR IN LISTS TEST_DIRS)
     target_compile_definitions("${TEST_NAME}" PRIVATE AWTRIX_PLATFORM_RP2040)
     target_sources("${TEST_NAME}" PRIVATE
       "${AWTRIX_ROOT}/src/core/Settings.cpp"
+      "${AWTRIX_ROOT}/src/core/sound/SoundMp3.cpp"
       "${AWTRIX_ROOT}/src/core/JsonColor.cpp"
       "${AWTRIX_ROOT}/src/core/WeekdayBarConfig.cpp"
       "${AWTRIX_ROOT}/src/core/payload/ScrollSpec.cpp"
