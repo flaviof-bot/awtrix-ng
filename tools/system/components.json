@@ -474,6 +474,10 @@
       "reason": "development-time MCU format reference; upstream tool sources are not vendored or linked into the application; attribution and license text are retained and included in TC002 bundle notices"
     },
     {
+      "notice": "pimoroni-pico",
+      "reason": "adapted into the Raspberry Pi Pico (Galactic Unicorn) firmware only, which is not an ESP32 or Linux target of this manifest; attribution row and license text are retained"
+    },
+    {
       "notice": "Arduino core for ESP32",
       "reason": "resolved by PlatformIO from the pin in platformio.ini for ESP32 builds; not vendored; not part of the Linux application"
     },
