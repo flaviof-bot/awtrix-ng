@@ -31,7 +31,7 @@ except ImportError:
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 REMOVED_KEYS = {"updateCheck", "colorTemperature", "clients", "save",
-                "matrixWidth", "panelHeight",
+                "matrixWidth",
                 "matrixLayout", "matrixTileWidth", "matrixOrientation", "matrixSerpentine",
                 "matrixFlipX", "matrixFlipY"}
 HISTORICAL_MENTIONS_OK = {
