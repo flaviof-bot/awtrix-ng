@@ -107,6 +107,9 @@ if [[ "$target" == pico ]]; then
     '.largestFreeBlockBytes > 0 and .largestFreeBlockBytes <= .freeHeapBytes'
   check "no sensors on the Pico" \
     'has("temperature") or has("humidity") or has("batteryPercent") | not'
+elif [[ "$target" == linux ]]; then
+  # Documented for the ESP32 only (docs/reference/device.md); the Linux app leaves it out.
+  check "no largestFreeBlockBytes on the Linux app" 'has("largestFreeBlockBytes") | not'
 else
   check "largestFreeBlockBytes in [0, freeHeapBytes]" \
     '.largestFreeBlockBytes >= 0 and .largestFreeBlockBytes <= .freeHeapBytes'
@@ -114,7 +117,16 @@ fi
 check "resetReason is a string" '.resetReason | type == "string"'
 call "version" 200 GET /api/v1/version
 call "system" 200 GET /api/v1/system
-check "panel geometry is numeric" '(.panelWidth | type == "number") and (.panelHeight | type == "number")'
+if [[ "$target" == linux ]]; then
+  # The Linux app's size comes from --width and --height: it has no panel settings
+  # (docs/reference/system.md), and capabilities.display reports it.
+  check "no panel settings on the Linux app" 'has("panelWidth") or has("panelHeight") | not'
+  jq -e '(.display.width | type == "number") and (.display.height | type == "number")' \
+    "$tmp/caps" >/dev/null 2>&1 && verdict 1 "  capabilities.display geometry is numeric" "" \
+    || verdict 0 "  capabilities.display geometry is numeric" ""
+else
+  check "panel geometry is numeric" '(.panelWidth | type == "number") and (.panelHeight | type == "number")'
+fi
 check "secrets are omitted" 'has("wifiPass") or has("mqttPass") or has("authPass") | not'
 call "screen" 200 GET /api/v1/display/screen
 check "pixels = width x height" '(.pixels | length) == .width * .height and .width > 0'
@@ -292,16 +304,30 @@ else
   call "big update of a missing script" 404 PUT "/api/v1/apps/script-update/$name" -H "$json" \
     --data-binary "@$tmp/big-update.json"
 fi
-if [[ "$mp3" == false ]]; then
-  call "no MP3" 503 GET /api/v1/audio/mp3 && unavailable
-  call "no MP3" 503 POST /api/v1/audio/play -H "$json" -d '{"mp3":"song"}' && unavailable
-  call "no MP3" 503 DELETE /api/v1/audio/mp3/song && unavailable
-else
+# 1.2.2's sound object has no "mp3" key: "file" names a stored MP3 or melody alike.
+call "mp3 is not a sound key" 422 POST /api/v1/audio/play -H "$json" -d '{"mp3":"song"}'
+check "validationFailed on mp3" '.error.code == "validationFailed" and .error.field == "mp3"'
+if [[ "$target" == linux ]]; then
+  # The Linux app builds the MP3 store and the station list in; it only has no audio output, so a
+  # station is refused at play time (docs/reference/http.md, "Radio").
   call "MP3 list" 200 GET /api/v1/audio/mp3
-fi
-if [[ "$radio" == false ]]; then
-  call "no radio" 503 PUT /api/v1/audio/stations -H "$json" -d '[]' && unavailable
-  call "no radio" 503 POST /api/v1/audio/play -H "$json" -d '{"station":0}' && unavailable
+  check "files is a list" '.files | type == "array"'
+  call "no such MP3" 404 DELETE /api/v1/audio/mp3/$name-none
+  call "stations" 200 GET /api/v1/audio/stations
+  if [[ "$radio" == false ]]; then
+    call "no audio output" 503 POST /api/v1/audio/play -H "$json" -d '{"station":0}' && unavailable
+  fi
+else
+  if [[ "$mp3" == false ]]; then
+    call "no MP3" 503 GET /api/v1/audio/mp3 && unavailable
+    call "no MP3" 503 DELETE /api/v1/audio/mp3/song && unavailable
+  else
+    call "MP3 list" 200 GET /api/v1/audio/mp3
+  fi
+  if [[ "$radio" == false ]]; then
+    call "no radio" 503 PUT /api/v1/audio/stations -H "$json" -d '[]' && unavailable
+    call "no radio" 503 POST /api/v1/audio/play -H "$json" -d '{"station":0}' && unavailable
+  fi
 fi
 call "audio" 200 GET /api/v1/audio
 # /update is only exercised where it cannot replace the firmware.
