@@ -13,6 +13,7 @@
 #include "core/script/ScriptHost.h"
 #include "core/sound/AudioSettings.h"
 #include "hal/IBoard.h"
+#include "platform/BuildFeatures.h"
 
 namespace awtrix {
 
@@ -155,7 +156,9 @@ void ApplicationRuntime::tick(int64_t nowMs, script::ScriptHost* scripts, TickOb
   ctx.font = services_.fonts.small().font;
   ctx.fonts = &services_.fonts;
   services_.clock.fill(ctx, nowMs);
-  if (scripts) scripts->tick(ctx, engine_.currentAppId(), engine_.incomingAppId());
+  // A build without scripting never references the host, so the linker drops it and Berry.
+  if (AWTRIX_FEATURE_SCRIPTING && scripts)
+    scripts->tick(ctx, engine_.currentAppId(), engine_.incomingAppId());
   if (observer) observer(ApplicationTickStage::Scripts);
 }
 
