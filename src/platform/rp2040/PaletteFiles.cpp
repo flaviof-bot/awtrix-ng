@@ -9,7 +9,7 @@
 #include "core/render/PaletteFile.h"
 #include "core/render/PaletteStore.h"
 
-namespace awtrix::rp2040 {
+namespace awtrix::pico {
 // The ESP32 entry point's loader, through the same PaletteStore mechanism. arduino-pico's open()
 // has no default mode, so the directory is opened with an explicit "r".
 void installPaletteLoader() {

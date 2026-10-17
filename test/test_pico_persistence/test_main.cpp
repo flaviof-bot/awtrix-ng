@@ -1,4 +1,5 @@
 #include <unity.h>
+#include <cstdio>
 
 #include <Preferences.h>
 
@@ -6,6 +7,7 @@
 #include "core/StateStore.h"
 #include "core/api/JsonWriter.h"
 #include "persistence/DeviceConfig.h"
+#include "persistence/DeviceConfigRows.h"
 #include "persistence/Filesystem.h"
 #include "persistence/NvsSettings.h"
 #include "persistence/RadioStore.h"
@@ -25,7 +27,15 @@ void legacy_matrix_keys_are_removed() {
   p.end();
   DeviceConfig cfg;
   cfg.load();
-  TEST_ASSERT_TRUE(cfg.save());
+  const bool saved = cfg.save();
+  if (!saved) {
+    Preferences check;
+    TEST_ASSERT_TRUE(check.begin("awtrix-cfg", true));
+    for (const auto& row : configfields::kRows)
+      if (!check.isKey(row.nvsKey)) std::printf("missing %s\n", row.nvsKey);
+    check.end();
+  }
+  TEST_ASSERT_TRUE(saved);
   TEST_ASSERT_TRUE(p.begin("awtrix-cfg", true));
   TEST_ASSERT_FALSE(p.isKey("ph"));
   TEST_ASSERT_FALSE(p.isKey("mwidth"));

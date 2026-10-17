@@ -104,12 +104,12 @@ void setup() {
   Serial.begin(115200);
   // Never wait for a USB host: the panel must boot with power alone.
   // Filesystem first: config, settings and palettes all come off it.
-  g_storageReady = fs::begin();
+  g_storageReady = awtrix::fs::begin();
   if (!g_storageReady) Serial.println("storage: mount failed; persistence unavailable");
   g_cfg = galacticUnicornDefaults();
   if (g_storageReady) {
     g_cfg.load();
-    rp2040::installPaletteLoader();
+    pico::installPaletteLoader();
   }
   logbuf::setVerbose(g_cfg.debugMode);
   g_board = &activeBoard(g_cfg);
