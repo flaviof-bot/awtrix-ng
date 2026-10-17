@@ -9,14 +9,20 @@ Where the ESP-IDF partition tool is available it also compiles each table to its
 binary form, which is the authoritative check -- it enforces rules this script
 does not restate.
 
+UF2 targets use the framework's linker layout, not an ESP-IDF partition table, so
+for them it checks every environment's LittleFS reservation in platformio.ini,
+inherited ones included. tools/test_partition_reservations.py covers that check.
+
     python tools/check_partitions.py
 """
 
+import configparser
 import glob
 import os
 import subprocess
 import sys
 import tempfile
+from decimal import Decimal, InvalidOperation
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
@@ -133,6 +139,48 @@ for soc, flash_text in REJECTED:
             % (soc, flash_text)
         )
 
+# UF2 targets use framework linker layouts, not ESP-IDF partition tables.
+# Check every inherited filesystem reservation, without environment-name exemptions.
+config = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";",))
+config.read(os.path.join(ROOT, "platformio.ini"))
+
+
+def inherited_option(section, key, seen=()):
+    if section in seen:
+        raise ValueError("environment inheritance cycle: " + section)
+    if config.has_option(section, key):
+        return config.get(section, key).strip()
+    parents = config.get(section, "extends", fallback="").replace(",", " ").split()
+    for parent in parents:
+        value = inherited_option(parent, key, seen + (section,))
+        if value is not None:
+            return value
+    if section != "env" and config.has_option("env", key):
+        return config.get("env", key).strip()
+    return None
+
+
+reservations = 0
+for section in config.sections():
+    if not section.startswith("env:"):
+        continue
+    try:
+        size = inherited_option(section, "board_build.filesystem_size")
+        if size is None:
+            continue  # ESP targets are checked through their generated tables above.
+        # arduino-pico sizes are MiB, for example 0.5m; unknown units fail, not skip.
+        if not size.lower().endswith("m"):
+            raise ValueError("filesystem size must use MiB (m)")
+        reserved = Decimal(size[:-1]) * 1024 * 1024
+        check(reserved.is_finite() and reserved >= gp.MIN_SPIFFS,
+              "%s: filesystem reservation %s is below the 512 KiB floor" % (section, size))
+        check(reserved.is_finite() and reserved % 4096 == 0,
+              "%s: filesystem reservation must be sector-aligned" % section)
+        print("%s: filesystem reservation %s bytes (framework linker layout)" % (section, reserved))
+        reservations += 1
+    except (ValueError, InvalidOperation, configparser.Error) as e:
+        failures.append("%s: %s" % (section, e))
+
 if failures:
     print("partition tables: %d problem(s)" % len(failures))
     for f in failures:
@@ -140,4 +188,5 @@ if failures:
     raise SystemExit(1)
 
 note = "" if idf_tool else " (ESP-IDF partition tool not found, skipped binary check)"
-print("partition tables: %d combinations OK%s" % (len(SUPPORTED), note))
+print("partition tables: %d combinations and %d filesystem reservations OK%s"
+      % (len(SUPPORTED), reservations, note))

@@ -100,6 +100,8 @@ class Pictures(unittest.TestCase):
         [diagram] = pe.find_panels("<!-- panel style=diagram -->\n" + SCRIPT, "p.md")
         first = pe.picture_hash(self.panel, (32, 8))
         self.assertNotEqual(first, pe.picture_hash(self.panel, (52, 16)))
+        self.assertNotEqual(first, pe.picture_hash(self.panel, pe.SIZES["rp2040"]))
+        self.assertEqual((53, 11), pe.SIZES["rp2040"])
         self.assertNotEqual(first, pe.picture_hash(diagram, (32, 8)))
         self.assertRegex(first, "^[0-9a-f]{12}$")
 

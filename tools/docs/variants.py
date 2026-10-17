@@ -1,12 +1,12 @@
 """MkDocs hook: build the documentation for one clock.
 
-AWTRIX_DOCS_VARIANT picks the build: `esp32`, `esp32-s3`, `tc002`, or `root` for the
-small landing site that sits above the three. tools/docs/build_site.py runs all four and
+AWTRIX_DOCS_VARIANT picks the build: `esp32`, `esp32-s3`, `tc002`, `rp2040`, or `root` for
+the small landing site that sits above the four. tools/docs/build_site.py runs all five and
 assembles them; a single `mkdocs serve` needs the variable set.
 
 Authors mark what belongs to which clock:
 
-* a page: front matter `only: [tc002]`. Pages without `only` are in all three clock builds,
+* a page: front matter `only: [tc002]`. Pages without `only` are in all four clock builds,
   never in `root`.
 * a passage: `<!-- only tc002 -->` ... `<!-- /only -->`, several names separated by spaces,
   on lines of their own or inline, nested where a passage narrows further. Markers inside
@@ -48,6 +48,9 @@ CLOCKS = [
     {"name": "ESP32-S3 DIY", "variant": "esp32-s3", "panel": "32–128 × 8",
      "text": "Your own panel on an ESP32-S3 board. With PSRAM and an amplifier board it also "
              "plays MP3s and internet radio."},
+    {"name": "Galactic Unicorn", "variant": "rp2040", "panel": "53 × 11",
+     "text": "Pimoroni's board with a Pico W or Pico 2 W: built-in display, buttons, light "
+             "sensor and a speaker for melodies. Installed over USB."},
 ]
 
 ROOT_ONLY_STATIC = ("firmware/",)

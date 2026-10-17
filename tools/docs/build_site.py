@@ -2,7 +2,7 @@
 
     python tools/docs/build_site.py [--out site]
 
-Builds `root`, `esp32`, `esp32-s3` and `tc002` with `mkdocs build --strict` through the
+Builds `root`, `esp32`, `esp32-s3`, `tc002` and `rp2040` with `mkdocs build --strict` through the
 hook in tools/docs/variants.py, then assembles:
 
     site/                 landing site (root build)
@@ -38,13 +38,17 @@ sys.path.insert(0, HERE)
 
 from only import ROOT, VARIANTS  # noqa: E402
 
+PICO = [r"Galactic Unicorn", r"\bPico\b", r"RP2040", r"RP2350"]
 FOREIGN = {
-    "esp32": [r"TC002", r"ESP32-S3", r"\bS3\b"],
-    "esp32-s3": [r"TC002", r"TC001"],
-    "tc002": [r"ESP32", r"\bS3\b", r"TC001"],
+    "esp32": [r"TC002", r"ESP32-S3", r"\bS3\b"] + PICO,
+    "esp32-s3": [r"TC002", r"TC001"] + PICO,
+    "tc002": [r"ESP32", r"\bS3\b", r"TC001"] + PICO,
+    "rp2040": [r"ESP32", r"\bS3\b", r"TC001", r"TC002"],
 }
 
-UNLINTED = ("developers/", "guides/ai-prompt/")
+# The Galactic Unicorn's driver and storage notes compare its code with the ESP32's.
+UNLINTED = ("developers/", "guides/ai-prompt/",
+            "advanced/galactic-unicorn-display/", "advanced/pico-persistence/")
 
 DIY = ("advanced/diy-build/", "reference/gpio/", "reference/system/")
 TERMS = [

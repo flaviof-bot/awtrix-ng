@@ -73,6 +73,7 @@ python tools/gen_agent_skill.py --check
 python tools/check_prelude_solidified.py
 python tools/check_font_sync.py
 python tools/check_partitions.py
+python tools/test_partition_reservations.py
 python tools/docs/build_site.py       # documentation, one build per clock
 node --test "tools/flowconv/*.test.mjs"
 cd webui/test && npm ci && npm test

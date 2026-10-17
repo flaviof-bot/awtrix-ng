@@ -1,8 +1,14 @@
+---
+only: [rp2040]
+---
+
 # Galactic Unicorn display
 
 The Pico W/Pico 2 W board drives the fixed 53x11 panel using the display half
 of Pimoroni pico **v1.23.0** (`3440ab232cdc2b019bb8d16f67b0448502efd9dc`, MIT).
-Audio and pico_graphics are not included. See `THIRD-PARTY-NOTICES.md`.
+Pimoroni's audio and pico_graphics implementations are not included; RTTTL uses
+arduino-pico I²S instead. See `THIRD-PARTY-NOTICES.md` and the
+[Galactic Unicorn guide](galactic-unicorn.md) for installing and hardware status.
 
 ## Height and wiring
 
@@ -53,7 +59,8 @@ All nine keys are active low and debounced for 35 ms. B held for 500 ms opens
 the shared launcher; A/C step in it. Rotation and swapButtons follow ButtonRouter.
 D remains unmapped. Sleep, brightness and volume use the engine command path.
 Volume steps the master `volume` (0-100 %), which AudioRouter applies to every group, tones included
-(see [Sound](#sound)). The A+C boot rescue is a separate milestone.
+(see [Sound](#sound)). Holding A and C at power-on is the scripting rescue (see
+[Scripting](#scripting)).
 
 | Input | GPIO | Function |
 |---|---|---|
@@ -271,7 +278,8 @@ returns to apps five seconds after the last frame. Universes start at zero and
 hold 170 RGB pixels each, continuing across the 53x11 canvas. Discovery
 advertises the shared HTTP server's web port.
 
-Hardware acceptance: flash the UF2, check the SSID/AP MODE behavior above,
+Hardware status: verified on PR 1 (1.2.1 base); see the guide's
+[verification scope](galactic-unicorn.md#verification-scope). To check a build again: flash the UF2, check the SSID/AP MODE behavior above,
 capture display and CYW43 PIO/SM logs plus `refresh advancing`, then check the
 animated boot screen during a stored-credential join. Host tests and firmware
 builds cannot establish physical Wi-Fi/display coexistence.

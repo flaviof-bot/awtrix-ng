@@ -32,6 +32,30 @@ class Terms(unittest.TestCase):
         self.assertEqual(2, len(build_site.term_problems("esp32", "guides/x/", text)))
 
 
+class OtherClocks(unittest.TestCase):
+    NAV = '<div class="md-sidebar--primary">Home</div><div class="md-content">'
+
+    def lint(self, variant, body):
+        page = ('<html>%s<article class="md-content__inner md-typeset"><p>%s</p></article></html>'
+                % (self.NAV, body))
+        with tempfile.TemporaryDirectory() as site:
+            with open(os.path.join(site, "index.html"), "w", encoding="utf-8") as f:
+                f.write(page)
+            return build_site.lint(variant, site, {})
+
+    def test_galactic_unicorn_pages_name_no_other_clock(self):
+        for word, found in (("ESP32", 1), ("ESP32-S3", 2), ("TC001", 1), ("TC002", 1)):
+            with self.subTest(word=word):
+                self.assertEqual(found, len(self.lint("rp2040", "Hold B on the %s." % word)))
+        self.assertEqual([], self.lint("rp2040", "Hold B on the Galactic Unicorn."))
+
+    def test_other_clocks_do_not_name_the_galactic_unicorn(self):
+        for variant in ("esp32", "esp32-s3", "tc002"):
+            with self.subTest(variant=variant):
+                problems = self.lint(variant, "Flash the Pico W in the Galactic Unicorn.")
+                self.assertEqual(2, len(problems))
+
+
 class PageText(unittest.TestCase):
     def test_words_split_by_markup_are_found(self):
         page = ('<html><article class="md-content__inner md-typeset"><p>It joins the '

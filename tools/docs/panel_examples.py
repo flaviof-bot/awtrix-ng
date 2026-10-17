@@ -19,7 +19,7 @@ import re
 import shlex
 from dataclasses import dataclass
 
-SIZES = {"esp32": (32, 8), "esp32-s3": (32, 8), "tc002": (52, 16)}
+SIZES = {"esp32": (32, 8), "esp32-s3": (32, 8), "tc002": (52, 16), "rp2040": (53, 11)}
 ASSET_DIR = "assets/panels"
 STYLES = ("led", "diagram")
 ALT = {

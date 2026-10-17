@@ -1,3 +1,7 @@
+---
+only: [rp2040]
+---
+
 # Galactic Unicorn storage
 
 The Pico W and Pico 2 W have no NVS partition. The Galactic Unicorn firmware keeps its

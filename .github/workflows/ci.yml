@@ -236,6 +236,10 @@ jobs:
         # overlap or a misaligned app offset only shows up once someone flashes
         # it. Cheap to check here, expensive to discover in the field.
         run: python tools/check_partitions.py
+      - name: Test the UF2 filesystem reservation check
+        # check_partitions.py also validates each UF2 environment's LittleFS size; these
+        # cases prove it rejects a bad or missing reservation instead of passing everything.
+        run: python tools/test_partition_reservations.py
       - name: Check the tag against the version and its release notes
         # The release body only links the release notes page of the docs, so a
         # tag without that page would publish a dead link.

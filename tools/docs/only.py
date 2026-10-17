@@ -14,7 +14,8 @@ Mistakes raise OnlyError; the hook reports them as build errors.
 
 import re
 
-VARIANTS = {"esp32": "ESP32 / TC001", "esp32-s3": "ESP32-S3", "tc002": "TC002"}
+VARIANTS = {"esp32": "ESP32 / TC001", "esp32-s3": "ESP32-S3", "tc002": "TC002",
+            "rp2040": "Galactic Unicorn"}
 ROOT = "root"
 NAMES = set(VARIANTS) | {ROOT}
 

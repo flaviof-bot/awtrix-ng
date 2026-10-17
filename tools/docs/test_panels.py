@@ -30,6 +30,17 @@ class Collect(unittest.TestCase):
         [inside] = [job for job in jobs.values() if job.page == "b.md"]
         self.assertEqual((1, 2), (inside.panel.line, inside.panel.source))
 
+    def test_the_galactic_unicorn_gets_its_own_size(self):
+        with tempfile.TemporaryDirectory() as docs:
+            docs = Path(docs)
+            (docs / "a.md").write_text("<!-- panel -->\n" + SCRIPT)
+            (docs / "b.md").write_text("<!-- only rp2040 -->\n<!-- panel -->\n"
+                                       '```json\n{"text": "X"}\n```\n<!-- /only -->\n')
+            jobs = panels.collect(docs, ["esp32", "esp32-s3", "tc002", "rp2040"])
+        found = sorted((job.page, job.size) for job in jobs.values())
+        self.assertEqual([("a.md", (32, 8)), ("a.md", (52, 16)), ("a.md", (53, 11)),
+                          ("b.md", (53, 11))], found)
+
     def test_a_bad_marker_names_its_page(self):
         with tempfile.TemporaryDirectory() as docs:
             (Path(docs) / "a.md").write_text("<!-- panel style=huge -->\n" + SCRIPT)

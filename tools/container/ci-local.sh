@@ -104,7 +104,8 @@ for step in "${steps[@]}"; do
             run_step docs-dependencies pip install -q -r requirements-docs.txt pyyaml
             for check in check_docs_sync test_check_error_messages check_error_messages \
                          check_flow_converter gen_agent_skill check_berry_api \
-                         check_prelude_solidified check_font_sync check_partitions; do
+                         check_prelude_solidified check_font_sync check_partitions \
+                         test_partition_reservations; do
                 if [[ "$check" == gen_agent_skill ]]; then
                     run_step "$check" python "tools/$check.py" --check
                 else

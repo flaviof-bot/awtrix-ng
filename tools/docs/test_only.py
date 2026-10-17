@@ -13,6 +13,10 @@ class Names(unittest.TestCase):
     def test_known_names(self):
         self.assertEqual({"esp32", "tc002"}, only.names("esp32 tc002", "x"))
 
+    def test_galactic_unicorn_is_a_clock(self):
+        self.assertEqual("Galactic Unicorn", only.VARIANTS["rp2040"])
+        self.assertEqual({"rp2040", "tc002"}, only.names("rp2040 tc002", "x"))
+
     def test_unknown_name_is_an_error(self):
         with self.assertRaisesRegex(only.OnlyError, "x: unknown clock tc003"):
             only.names("tc003", "x")
@@ -47,6 +51,15 @@ class FilterMarkdown(unittest.TestCase):
         text = "a\n<!-- only tc002 -->\nb\n<!-- /only -->\nc\n"
         self.assertEqual("a\nb\nc\n", only.filter_markdown(text, "tc002", "p"))
         self.assertEqual("a\nc\n", only.filter_markdown(text, "esp32", "p"))
+
+    def test_galactic_unicorn_passage(self):
+        text = "a\n<!-- only rp2040 -->\nb\n<!-- /only -->\n<!-- only esp32 tc002 -->\nc\n<!-- /only -->\n"
+        self.assertEqual("a\nb\n", only.filter_markdown(text, "rp2040", "p"))
+        self.assertEqual("a\nc\n", only.filter_markdown(text, "tc002", "p"))
+
+    def test_page_for_the_galactic_unicorn_only(self):
+        self.assertEqual({"rp2040"}, only.page_only("---\nonly: [rp2040]\n---\n# T\n", "p.md"))
+        self.assertIn("rp2040", only.page_only("# T\n", "p.md"))
 
     def test_origin_maps_each_kept_line_to_its_source_line(self):
         text = "a\n<!-- only tc002 -->\nb\n<!-- /only -->\nc\n"

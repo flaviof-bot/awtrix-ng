@@ -1,5 +1,5 @@
 ---
-only: [root, esp32, esp32-s3, tc002]
+only: [root, esp32, esp32-s3, tc002, rp2040]
 hide:
   - toc
 ---
@@ -22,6 +22,9 @@ small apps you write yourself.
 <!-- /only -->
 <!-- only tc002 -->
 [Install AWTRIX NG](getting-started/tc002.md){ .md-button .md-button--primary }
+<!-- /only -->
+<!-- only rp2040 -->
+[Install AWTRIX NG](advanced/galactic-unicorn.md#flash-over-usb){ .md-button .md-button--primary }
 <!-- /only -->
 
 <!-- only root -->
@@ -49,7 +52,7 @@ Hundreds of apps and automations and thousands of icons from the AWTRIX communit
 click **Send to AWTRIX**, and it is on your clock.
 
 [:material-store: Open the AWTRIX Hub](https://awtrix.de){ .md-button .md-button--primary }
-<!-- only esp32 esp32-s3 tc002 -->
+<!-- only esp32 esp32-s3 tc002 rp2040 -->
 [How it works](guides/hub.md){ .md-button }
 <!-- /only -->
 
@@ -130,7 +133,7 @@ same.
 </div>
 <!-- /only -->
 
-<!-- only esp32 esp32-s3 tc002 -->
+<!-- only esp32 esp32-s3 tc002 rp2040 -->
 ## Up and running in four steps
 
 <!-- only esp32 esp32-s3 -->
@@ -138,6 +141,9 @@ same.
 <!-- /only -->
 <!-- only tc002 -->
 1. **Install** the firmware: [Install AWTRIX NG](getting-started/tc002.md).
+<!-- /only -->
+<!-- only rp2040 -->
+1. **Install** the firmware over USB: [Galactic Unicorn](advanced/galactic-unicorn.md#flash-over-usb).
 <!-- /only -->
 2. **Connect to Wi-Fi** through the clock's setup hotspot: [Connect to Wi-Fi](getting-started/first-boot.md).
 3. **Find your clock** and open its address in a browser: [Find your clock](getting-started/discovery.md).

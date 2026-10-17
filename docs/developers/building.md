@@ -120,6 +120,7 @@ Pico 2 W (`galactic_unicorn_2w`). The platform is `src/platform/rp2040/`, a peer
 `src/platform/esp32/`: its entry point builds the engine through `ApplicationRuntime` like the
 ESP32's, and `src/platform/rp2040/include/` holds its `platform_*` headers. The source filter is
 an explicit allowlist, so only the portable core and the services ported to the Pico are linked.
+See [Galactic Unicorn](site:rp2040/advanced/galactic-unicorn/) for flashing and features.
 
 | Property | Value |
 |---|---|
@@ -239,7 +240,9 @@ rest, minus a 64 KB coredump region. One slot size covers every SoC and every fl
 | 16 MB | 1.69 MB | 12.5 MB |
 
 `python tools/check_partitions.py` renders every combination and checks the rules that make a
-table bootable. It runs in CI.
+table bootable. The Galactic Unicorn's UF2 images use the framework's linker layout instead of a
+partition table, so the same check also validates every environment's LittleFS reservation,
+inherited ones included; `tools/test_partition_reservations.py` covers it. Both run in CI.
 
 To inspect or produce one by hand:
 
@@ -315,7 +318,7 @@ PlatformIO installed through `pip`, plus Node.js for the firmware builds and the
 | TC002 image tools | Reusable `tc002-image-tools.yml` | The pinned WASM tools and browser/desktop installer tests; CI, Docs and installer packaging reuse the verified cache for identical inputs |
 | Firmware build | `pio run -e <env>`, then `scripts/factory_image.py --all` | `awtrix`, `awtrix_s3_octal`, `awtrix_s3_quad`, and a USB install image per flash size |
 | Pico firmware build | `pio run -e <env>` | `galactic_unicorn`, `galactic_unicorn_2w`; uploads `uf2-<env>` with the `firmware.uf2` |
-| API docs match the firmware | `tools/check_docs_sync.py`, `check_flow_converter.py`, `gen_agent_skill.py --check`, `check_berry_api.py`, `check_prelude_solidified.py`, `check_font_sync.py`, `check_partitions.py` | Documented fields and error codes, the flow converter's maps, the downloadable agent skill, the editor's Berry table, the solidified prelude, the generated panel fonts, every partition table |
+| API docs match the firmware | `tools/check_docs_sync.py`, `check_flow_converter.py`, `gen_agent_skill.py --check`, `check_berry_api.py`, `check_prelude_solidified.py`, `check_font_sync.py`, `check_partitions.py`, `test_partition_reservations.py` | Documented fields and error codes, the flow converter's maps, the downloadable agent skill, the editor's Berry table, the solidified prelude, the generated panel fonts, every partition table and UF2 filesystem reservation |
 
 On a `v*` tag a release job also publishes every ESP32 update image, the USB install images for
 each supported flash size, the Galactic Unicorn UF2s (`firmware-galactic-unicorn.uf2`,
