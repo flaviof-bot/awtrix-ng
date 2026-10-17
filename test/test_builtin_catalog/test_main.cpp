@@ -25,7 +25,8 @@ void builtin_catalog_parity() {
     "Fireworks","LookingEyes","Matrix","MovingLine","Pacifica","PingPong","Plasma","PlasmaCloud",
     "Radar","Ripple","Snake","SwirlIn","SwirlOut","TheaterChase","TwinklingStars"};
   TEST_ASSERT_TRUE(expected == b.effects().names());
-  TEST_ASSERT_EQUAL(15,b.effects().paletteNames().size());
+  // PR 1 counted 15 on 1.2.1; 1.2.2's shared registry has 16 palette effects on every board.
+  TEST_ASSERT_EQUAL(16,b.effects().paletteNames().size());
   const std::vector<std::string> overlays = {"drizzle","frost","rain","snow","storm","thunder"};
   TEST_ASSERT_TRUE(overlays == b.overlays().names());
 }
