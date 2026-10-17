@@ -8,8 +8,10 @@
 #include "core/FrameClock.h"
 #include "core/PlatformDescriptor.h"
 #include "core/ScreenDisplay.h"
+#include "core/SystemPageClock.h"
 #include "core/SettingsSaver.h"
 #include "core/apps/DefaultApps.h"
+#include "core/effects/EffectNoise.h"
 #include "core/render/BootScreen.h"
 #include "core/render/ProvisioningScreen.h"
 #include "core/render/TextRenderer.h"
@@ -23,13 +25,21 @@
 #include "persistence/NvsSettings.h"
 #include "platform/BuildFeatures.h"
 #include "platform/rp2040/PaletteFiles.h"
+#include "platform/rp2040/PicoSleep.h"
 #include "platform/rp2040/RadioStartup.h"
+#include "platform/rp2040/ResetReason.h"
 #include "platform/rp2040/Rp2040Profile.h"
+#include "platform/rp2040/TimeService.h"
 #include "system/Log.h"
 #include "system/GalacticUnicornControls.h"
+#include "transport/net/ArtnetService.h"
+#include "transport/net/DiscoveryService.h"
 #include "transport/net/NetworkService.h"
 
 #include <LittleFS.h>
+#include <WiFi.h>
+#include <hardware/gpio.h>
+#include <pico/rand.h>
 #include "system/MonotonicClock.h"
 
 // Feature macros describe this build, not a claim that a runtime service exists.
@@ -37,23 +47,26 @@ static_assert(!AWTRIX_FEATURE_SCRIPTING && !AWTRIX_FEATURE_MP3 &&
               !AWTRIX_FEATURE_RADIO && !AWTRIX_FEATURE_OUTBOUND_TLS &&
               !AWTRIX_FEATURE_BROWSER_OTA, "Pico build must not enable unsupported services");
 
+// Build-only measurement switch (-D AWTRIX_PICO_UDP=0); every release build has both UDP services.
+#ifndef AWTRIX_PICO_UDP
+#define AWTRIX_PICO_UDP 1
+#endif
+
 using namespace awtrix;
 
 namespace {
-// M4a2: replaced by the Pico's time service. Until then built-ins render their unset-clock state.
-class UnsetClock final : public IPageClock {
- public:
-  void fill(RenderCtx& ctx, int64_t nowMs) override {
-    ctx.nowMs = nowMs;
-    ctx.epochMs = -1;
-  }
-};
-
-// M4a2: sleep. A reset removes the namespace files and reboots without saving over them.
+// The Pico has no deep sleep: a timed sleep blanks the panel, lets the radio save power and waits
+// for the duration or a new press of the Sleep key, then restarts like an ESP32 waking up.
 class PicoSystem final : public ISystemService {
  public:
   void reboot() override { rebootPending = true; }
-  void sleep(uint64_t) override { Serial.println("sleep unavailable"); }
+  void sleep(uint64_t durationMs) override {
+    if (durationMs == 0) return;
+    sleepMs = durationMs;
+    sleepPending = true;
+    rebootPending = true;
+  }
+  // A reset removes the namespace files and reboots without saving over them.
   void factoryReset() override {
     LittleFS.remove("/NVS/awtrix-cfg.bin");
     resetSettings();
@@ -63,8 +76,24 @@ class PicoSystem final : public ISystemService {
     resetPending = true;
     rebootPending = true;
   }
+  // Runs once the power animation has played out; never returns.
+  [[noreturn]] void restart(IBoard& board, Canvas& canvas) {
+    if (sleepPending) {
+      canvas.clear(0x000000u);
+      board.show(canvas);
+      delay(200);
+      WiFi.aggressiveLowPowerMode();
+      const auto pressed = [] { return !gpio_get(galactic::Sleep); };
+      PicoSleep sleeper(monotonicMs(), sleepMs, pressed());
+      while (!sleeper.wake(monotonicMs(), pressed())) delay(10);
+    }
+    rp2040.reboot();
+    for (;;) {}
+  }
   bool rebootPending = false;
   bool resetPending = false;
+  bool sleepPending = false;
+  uint64_t sleepMs = 0;
 };
 
 // Eight rows is the compatibility mode; 9 and 10 are rejected by ConfigRules.
@@ -75,7 +104,13 @@ GalacticUnicornControls g_controls;
 sound::AudioRouter g_audio; // Null sinks honestly report MP3/radio unavailable.
 ScreenDisplay g_display;
 PicoSystem g_system;
-UnsetClock g_pageClock;
+SystemPageClock g_pageClock;
+platform::TimeService g_time;
+bool g_netWasConnected = false;
+#if AWTRIX_PICO_UDP
+DiscoveryService g_disco;
+ArtnetService g_artnet;
+#endif
 DeviceConfig g_cfg;
 bool g_storageReady = false;
 bool g_settingsDirty = false;
@@ -131,6 +166,8 @@ void paceFrame() {
 
 void setup() {
   Serial.begin(115200);
+  noise::reseed(get_rand_32());
+  Serial.printf("reset: %s\n", platform::resetReasonName());
   // Never wait for a USB host: the panel must boot with power alone.
   // Filesystem first: config, settings and palettes all come off it.
   g_storageReady = awtrix::fs::begin();
@@ -187,6 +224,14 @@ void setup() {
   // Joining a network from the provisioning AP reboots, so setup reruns with an address.
   g_net.setOnJoinedFromAp([] { g_system.reboot(); });
   g_net.begin(g_cfg, g_runtime->engine().state().runtime().wifi, forceAp, showBootLogo);
+  g_time.apply(g_cfg.tz, g_cfg.ntpServer, true);
+  g_netWasConnected = g_net.isConnected();
+#if AWTRIX_PICO_UDP
+  if (g_netWasConnected) {
+    g_disco.begin(g_net.hostname(), g_cfg.webPort);
+    if (g_cfg.artnet) g_artnet.begin();
+  }
+#endif
   static_cast<GalacticUnicornBoard*>(g_board)->logRefreshProgress();
 }
 
@@ -197,6 +242,16 @@ void loop() {
   g_controls.sampleLight(g_runtime->engine(), unicorn.readLdrRaw(), now);
   g_runtime->beginFrame(now);
   g_net.tick(static_cast<uint32_t>(now));
+  const bool netConnected = g_net.isConnected();
+  // A changed tz or ntpServer restarts SNTP; so does the link coming back, as on the ESP32.
+  g_time.apply(g_cfg.tz, g_cfg.ntpServer, netConnected && !g_netWasConnected);
+#if AWTRIX_PICO_UDP
+  if (netConnected && !g_netWasConnected) g_disco.begin(g_net.hostname(), g_cfg.webPort);
+  if (netConnected && g_cfg.artnet) g_artnet.begin();
+  else g_artnet.end();
+  if (netConnected) g_disco.tick();
+#endif
+  g_netWasConnected = netConnected;
   // Collapses a burst of settings changes into one write; every write costs flash erase budget.
   if (g_settingsDirty && g_storageReady && !g_system.rebootPending && g_settingsSaver.due(now)) {
     nvs::saveSettings(g_runtime->engine().state().settings());
@@ -204,17 +259,28 @@ void loop() {
     g_settingsSaver.saved(now);
   }
   g_runtime->tick(now); // M6a: the script host.
-  g_runtime->render(now, [](Canvas& canvas, int64_t frameMs, void*) {
-    if (!g_net.apMode()) return PlatformFrame::None;
-    render::drawProvisioningScreen(canvas, awtrixFont(), frameMs);
-    return PlatformFrame::Rendered;
+  const bool artnetFrame = g_runtime->render(now, [](Canvas& canvas, int64_t frameMs, void*) {
+    if (g_net.apMode()) {
+      render::drawProvisioningScreen(canvas, awtrixFont(), frameMs);
+      return PlatformFrame::Rendered;
+    }
+#if AWTRIX_PICO_UDP
+    return g_artnet.tick(canvas, frameMs) ? PlatformFrame::ExternalRate : PlatformFrame::None;
+#else
+    return PlatformFrame::None;
+#endif
   });
   g_board->show(g_runtime->canvas());
   if (g_system.rebootPending && !g_runtime->powerBusy()) {
-    // A requested reboot keeps pending settings, unless a reset just removed them.
+    // A requested reboot or sleep keeps pending settings, unless a reset just removed them.
     if (g_settingsDirty && g_storageReady && !g_system.resetPending)
       nvs::saveSettings(g_runtime->engine().state().settings());
-    rp2040.reboot();
+    g_system.restart(*g_board, g_runtime->canvas());
   }
-  paceFrame();
+  // An Art-Net sender sets its own frame rate, as on the ESP32.
+  if (artnetFrame) {
+    delay(5);
+  } else {
+    paceFrame();
+  }
 }

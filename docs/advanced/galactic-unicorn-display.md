@@ -103,6 +103,43 @@ LEAmDNS is polled every loop. These records match ESP32, but **HTTP and its
 provisioning form are not wired yet** (M4b): joining the AP cannot save
 credentials yet and a phone may report no Internet/no working portal.
 
+## Time, reset and sleep
+
+The configured POSIX `tz` and `ntpServer` feed the core's asynchronous SNTP
+client. It restarts only when either changes, or on a disconnected-to-connected
+transition (matching ESP32 reconnect behavior). DNS/NTP retries are asynchronous.
+The same `SystemPageClock` as ESP32 converts UTC to local time, including DST;
+years before 2020 remain unset, so until the first sync the clock and date show
+their unset state. No battery-backed clock is assumed. Effect noise is seeded
+from Pico SDK `get_rand_32()` hardware entropy at boot.
+
+Reset reporting uses the framework's best-effort cause: power-on → `poweron`,
+watchdog → `watchdog`, reboot → `software`, RUN pin/debug → `external`,
+brownout → `brownout` when distinguishable, otherwise `unknown`. ESP32 values
+are unchanged. Pico boot logs report this reason (`reset: ...`).
+
+The Pico has **no ESP32-style deep sleep with GPIO wake**; `POST
+/api/v1/device/sleep` is **emulated**. Like a reboot it runs after the display
+power animation. Sleep then blanks the panel, enables CYW43 aggressive power
+saving, and waits with short yields. The CPU, RAM and panel refresh hardware
+remain powered; this is not a low-microamp shutdown. Application and network
+handling pause. The requested duration ends sleep; a press of the Sleep key
+(GPIO27) also wakes it. A key held on entry must be released before a new press
+wakes it. Wake restarts the application like ESP32 deep-sleep wake, but reports
+`software`, not `deepSleep`. The ordinary Sleep key display toggle remains
+separate and does not enter this timed sleep. Check timer wake and a
+release/new GPIO27 press on physical hardware.
+
+## UDP services
+
+Both Pico builds include shared discovery (query `FIND_AWTRIXNG` on UDP 4210,
+reply `host[:port]` on 4211) and Art-Net on UDP 6454 when `artnet` is enabled.
+The Pico binding uses WiFiUDP behind the shared `UdpSocket`, so the protocol
+code is the ESP32's. Art-Net takes over below the power and AP screens and
+returns to apps five seconds after the last frame. Universes start at zero and
+hold 170 RGB pixels each, continuing across the 53x11 canvas. Discovery
+advertises the web port; the HTTP server itself comes in M4b.
+
 Hardware acceptance: flash the UF2, check the SSID/AP MODE behavior above,
 capture display and CYW43 PIO/SM logs plus `refresh advancing`, then check the
 animated boot screen during a stored-credential join. Host tests and firmware

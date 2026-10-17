@@ -1,5 +1,70 @@
 #include "transport/net/UdpSocket.h"
 
+#if defined(AWTRIX_PLATFORM_RP2040)
+#include <WiFi.h>
+
+namespace awtrix {
+
+namespace {
+uint32_t hostOrder(const IPAddress& ip) {
+  return (uint32_t(ip[0]) << 24) | (uint32_t(ip[1]) << 16) | (uint32_t(ip[2]) << 8) | ip[3];
+}
+IPAddress fromHostOrder(uint32_t a) {
+  return IPAddress(uint8_t(a >> 24), uint8_t(a >> 16), uint8_t(a >> 8), uint8_t(a));
+}
+}
+
+// arduino-pico's WiFiUDP stands in for the socket; the contract (non-blocking receive, 0 when
+// nothing is waiting, -1 on error) is the same, so the shared UDP services run unchanged.
+bool UdpSocket::open(uint16_t port) {
+  close();
+  fd_ = udp_.begin(port) ? 0 : -1;
+  return isOpen();
+}
+
+void UdpSocket::close() {
+  udp_.stop();
+  fd_ = -1;
+  havePeer_ = false;
+  peerAddr_ = 0;
+}
+
+int UdpSocket::receive(void* buf, std::size_t cap) {
+  net::Endpoint from;
+  const int n = receiveFrom(buf, cap, from);
+  if (n > 0) {
+    peerAddr_ = from.address;
+    havePeer_ = true;
+  }
+  return n;
+}
+
+int UdpSocket::receiveFrom(void* buf, std::size_t cap, net::Endpoint& from) {
+  if (!isOpen() || cap == 0) return -1;
+  if (udp_.parsePacket() <= 0) return 0;
+  from.address = hostOrder(udp_.remoteIP());
+  from.port = udp_.remotePort();
+  const int n = udp_.read(static_cast<unsigned char*>(buf), cap);
+  // A datagram longer than the buffer is truncated, as recvfrom() does.
+  while (udp_.available()) udp_.read();
+  return n;
+}
+
+bool UdpSocket::sendTo(const net::Endpoint& to, const void* data, std::size_t len) {
+  if (!isOpen() || !udp_.beginPacket(fromHostOrder(to.address), to.port)) return false;
+  const auto n = udp_.write(static_cast<const uint8_t*>(data), len);
+  return udp_.endPacket() && n == len;
+}
+
+bool UdpSocket::replyTo(uint16_t port, const void* data, std::size_t len) {
+  if (!isOpen() || !havePeer_) return false;
+  return sendTo(net::Endpoint{peerAddr_, port}, data, len);
+}
+
+}
+
+#else
+
 #if defined(ESP_PLATFORM)
 #include <lwip/sockets.h>
 #else
@@ -90,3 +155,5 @@ bool UdpSocket::replyTo(uint16_t port, const void* data, std::size_t len) {
 }
 
 }
+
+#endif

@@ -13,12 +13,16 @@ namespace awtrix {
 class SystemPageClock : public IPageClock {
  public:
   void fill(RenderCtx& ctx, int64_t nowMs) override {
-    ctx.nowMs = nowMs;
     const auto now = std::chrono::system_clock::now();
-    const std::time_t t = std::chrono::system_clock::to_time_t(now);
     const int64_t epochMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                                 now.time_since_epoch())
                                 .count();
+    fillAt(ctx, nowMs, epochMs);
+  }
+  // fill() at a given wall-clock time, so a host test can check the conversion.
+  static void fillAt(RenderCtx& ctx, int64_t nowMs, int64_t epochMs) {
+    ctx.nowMs = nowMs;
+    const std::time_t t = static_cast<std::time_t>(epochMs / 1000);
     std::tm tmv{};
 #if defined(_WIN32)
     localtime_s(&tmv, &t);
