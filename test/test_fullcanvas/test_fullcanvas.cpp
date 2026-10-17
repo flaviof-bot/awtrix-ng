@@ -72,9 +72,17 @@ static void test_effect_overlay_and_eyes() {
     for (int x = 0; x < 53; ++x) changed |= p.c.getPixel(x, y) != background;
     TEST_ASSERT_TRUE(changed);
   }
-  LookingEyesEffect eyes;
-  eyes.render(p.c, 0); // before the first blink: eyeballs span the canvas
-  p.everyRow();
+  // 1.2.2 scales the Eye sprite by whole pixels and centres it: at 53x11 it is the 53x8 frame
+  // one row down.
+  LookingEyesEffect eyes, shortEyes;
+  p.c.clear();
+  eyes.render(p.c, 0);
+  Canvas eight(53, 8);
+  shortEyes.render(eight, 0);
+  for (int y = 0; y < 11; ++y)
+    for (int x = 0; x < 53; ++x)
+      TEST_ASSERT_EQUAL_HEX32(y >= 1 && y < 9 ? eight.getPixel(x, y - 1) : 0u, p.c.getPixel(x, y));
+  p.check();
 }
 static void test_transition_full_height() {
   Panel p;
