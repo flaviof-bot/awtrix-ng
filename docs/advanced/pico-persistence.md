@@ -27,5 +27,6 @@ and the defaults load. A number wider than four bytes is rejected, never truncat
   namespace files and reboots without saving over them.
 - Restored assets are staged next to their target and renamed once complete; every folder a
   nested entry such as `/ICONS/sub/smile.gif` needs is created.
-- Scripts and radio are compiled out of these builds, so the radio station list is not stored.
+- Scripts persist in `/SCRIPTS` as on the ESP32. Radio is compiled out of these builds, so the
+  radio station list is not stored.
 - Custom palettes in `/PALETTES` are found by name, as on the ESP32.

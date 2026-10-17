@@ -135,8 +135,9 @@ type checks (415), settings validation (422) and provisioning-mode admission as
 on ESP32. The Pico WebServer uses its `HTTPServer&` request hooks, including
 `canRaw`; larger bodies stream into the fixed arena instead of an unbounded
 String. File and melody listings use LittleFS's File API rather than an ESP VFS
-mount, and file hashes use BearSSL's SHA-256. Scripting, MP3 and radio routes
-keep the shared 503 `unavailable` policy. `/update` answers 503 `unavailable`
+mount, and file hashes use BearSSL's SHA-256. MP3 and radio routes keep the
+shared 503 `unavailable` policy; the script routes do too in a build with
+`-D AWTRIX_FEATURE_SCRIPTING=0`. `/update` answers 503 `unavailable`
 with an instruction to flash a **UF2 over USB using BOOTSEL**: browser OTA is not
 supported. `updateImage` names the UF2 for this board
 (`firmware-galactic-unicorn.uf2` or `firmware-galactic-unicorn-2w.uf2`); use it,
@@ -146,8 +147,27 @@ Device heap facts use `rp2040.getFreeHeap()`. `minFreeHeapBytes` is the minimum
 sampled by device-state requests, not an allocator-wide low-water mark.
 `largestFreeBlockBytes` is the free block at the top of the heap: newlib cannot
 list the holes further down, so the true largest block can only be larger.
-PSRAM facts are omitted. `scriptHeapPool` is `unavailable` with a budget of 0.
+PSRAM facts are omitted. `scriptHeapPool` is `internal`, with a budget of 48 KB
+on the Pico W and 96 KB (the ESP32's) on the Pico 2 W
+(`-D AWTRIX_RP2040_SCRIPT_HEAP_KB=n` changes it), taken from the one heap Wi-Fi,
+HTTP, MQTT and the display share. A build with `-D AWTRIX_FEATURE_SCRIPTING=0`
+reports `unavailable` with a budget of 0.
 The body-copy guard checks total free heap on the Pico, not the largest block.
+
+## Scripting
+
+Berry scripts run on both builds, wired as on the ESP32: the script host, its
+store in `/SCRIPTS`, MQTT, buttons and script icons. `print()` and debug lines go
+to the shared log (`/api/v1/logs`). Each call into a script is capped at the
+VM's instruction limit and returns to the main loop, which feeds the watchdog.
+Holding **A and C** (left and right) for three seconds at power-on turns
+scripting off and shows `NOSCR`, the ESP32's rescue combo. Script `http.*`
+requests and Modbus reads, which share their request path, return `false`: the
+Pico has no script HTTP worker yet.
+
+The boot, display and tone lines reach the shared log too. The PIO, state
+machine and DMA claims are verbose: `/api/v1/logs` shows them only with
+`debugMode` on, while serial always prints them.
 
 arduino-pico's lwIP has five TCP pcbs. The listener runs at its clients' TCP
 priority, so a SYN that finds the pool full is dropped (the browser retries)
