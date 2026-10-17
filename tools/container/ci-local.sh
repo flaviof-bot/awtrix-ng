@@ -18,8 +18,8 @@ while (( $# )); do
     case "$1" in
         native|linux|webui|docs|mkdocs) steps+=("$1"); shift ;;
         all)
-            # M3a adds galactic_unicorn and galactic_unicorn_2w here.
-            steps+=(native linux webui docs mkdocs build:awtrix build:awtrix_s3_octal build:awtrix_s3_quad)
+            steps+=(native linux webui docs mkdocs build:awtrix build:awtrix_s3_octal build:awtrix_s3_quad
+                   build:galactic_unicorn build:galactic_unicorn_2w)
             shift ;;
         build)
             shift
