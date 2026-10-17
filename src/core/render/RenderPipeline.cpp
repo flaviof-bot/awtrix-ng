@@ -235,9 +235,10 @@ void RenderPipeline::renderPage(Canvas& dst, const std::string& id, int64_t nowM
     const FontEntry& font = fontFor(&spec);
     // Without a page zoom, eight-row page text sits in the content band, on the same rows as the
     // icon and the built-in apps. With one (TC002), and for fonts taller than the band, the line box
-    // stays centred on the canvas.
+    // stays centred on the canvas, as does a font whose baseline would fall below the band.
     const bool band = (!d_.zoom || !d_.zoom->available()) &&
-                      font.ascent + font.descent <= render::kContentBandHeight;
+                      font.ascent + font.descent <= render::kContentBandHeight &&
+                      pageBaseline(font) < render::kContentBandHeight;
     r.textBand = band;
     r.baseline = band ? pageBaseline(font) : pageBaseline(font, page.height());
     r.drawBaseline = pageBaseline(font);
