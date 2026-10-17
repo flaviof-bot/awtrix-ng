@@ -34,14 +34,14 @@ static void http_profiles() {
       {"POST", "/api/v1/audio/play", "{\"station\":\"demo\"}"},
       {"POST", "/api/v1/audio/play", "{\"station\":0}"},
       {"POST", "/api/v1/audio/play", "{\"file\":\"https://example.com/live.mp3\"}"},
-      {"POST", "/api/v1/audio/play", "[{\"file\":\"demo\"},{\"station\":\"demo\"}]"},
+      {"POST", "/api/v1/audio/play", "[{\"file\":\"demo\"},{\"file\":\"https://example.com/a.mp3\"}]"},
       {"GET", "/update", ""}, {"POST", "/update", "binary"},
   };
   for (const auto& req : requests) {
     Command cmd;
     api::HttpResult result;
     TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(api::RouteOutcome::Respond),
-        static_cast<int>(api::routeHttp(req.method, req.path, req.body, cmd, result, pico)), req.path);
+        static_cast<int>(api::routeHttp(req.method, req.path, req.body, cmd, result, pico)), req.body);
     TEST_ASSERT_EQUAL_INT_MESSAGE(503, result.status, req.body);
     TEST_ASSERT_TRUE(result.body.find("\"code\":\"unavailable\"") != std::string::npos);
     // Every board that keeps every feature routes exactly as before.
