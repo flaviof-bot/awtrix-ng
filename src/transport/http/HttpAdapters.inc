@@ -342,7 +342,7 @@ void pruneDirectory(const std::string& directory) {
 
 // streamFile() writes straight to the client, past the Pico's fed writes, so there a file goes out
 // through sendContent() in pieces instead. Other boards keep streamFile().
-void sendFile(WebServer& server, File& f, const char* type) {
+void streamFileFed(WebServer& server, File& f, const char* type) {
 #if defined(AWTRIX_PLATFORM_RP2040)
   server.setContentLength(f.size());
   server.send(200, type, "");
@@ -469,7 +469,7 @@ class EspReply final : public api::Reply {
   bool sendFile(const std::string& path, const char* contentType) override {
     File file = LittleFS.open(path.c_str(), "r");
     if (!file || file.isDirectory()) { if (file) file.close(); return false; }
-    sendFile(server_, file, contentType);
+    streamFileFed(server_, file, contentType);
     file.close();
     return true;
   }
