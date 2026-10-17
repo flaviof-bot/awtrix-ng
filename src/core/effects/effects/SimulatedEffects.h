@@ -15,9 +15,7 @@ namespace awtrix {
 namespace fx {
 
 // Breakout on autopilot: the paddle follows the ball and aims with a different part of its
-// face on every return, so the ball fans out over the wall instead of repeating one path. Bricks
-// are 3 LEDs with a 1-LED gap and one goes per hit; the paddle's middle returns the ball at 45
-// degrees, its edges shallow (2 across per 1 up).
+// face on every return, so the ball fans out over the wall instead of repeating one path.
 struct Breakout {
   static constexpr int kMaxRows = 8;
   static constexpr int kMaxCols = 64;
@@ -37,7 +35,7 @@ struct Breakout {
     h = static_cast<int16_t>(height);
     rng.state = seed;
     rows = static_cast<uint8_t>(std::max(1, std::min({kMaxRows, h * 3 / 8, h - 4})));
-    brickW = 4;
+    brickW = static_cast<uint8_t>(std::max(2, w / 16));
     cols = static_cast<uint8_t>(std::max(1, std::min(kMaxCols, w / brickW)));
     left = static_cast<int16_t>((w - cols * brickW) / 2);
     top = h >= 16 ? 1 : 0;
@@ -112,7 +110,7 @@ struct Breakout {
     // Faces first, then the corner: a ball that only grazes a brick diagonally rebounds straight
     // back, one that meets a face bounces off that face.
     bool vertical = smash(bx, ny);
-    bool horizontal = !vertical && smash(nx, by);
+    bool horizontal = smash(nx, by);
     if (!vertical && !horizontal && smash(nx, ny)) vertical = horizontal = true;
     if (vertical || horizontal) {
       if (vertical) dy = static_cast<int8_t>(-dy);
@@ -128,9 +126,8 @@ struct Breakout {
         return;
       }
       const int third = std::max(1, paddleW / 3);
-      if (rel < third) dx = -2;
-      else if (rel >= paddleW - third) dx = 2;
-      else dx = static_cast<int8_t>(dx < 0 ? -1 : 1);
+      if (rel < third) dx = -1;
+      else if (rel >= paddleW - third) dx = 1;
       dy = -1;
       aim = static_cast<int8_t>(rng.below(paddleW) - paddleW / 2);
       return;
