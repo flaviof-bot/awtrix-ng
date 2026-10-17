@@ -104,8 +104,22 @@ void GalacticUnicornBoard::begin() {
   pio_sm_set_enabled(pio_, sm_, true);
   dma_start_channel_mask(1u << controlDma_);
   ready_ = true;
-  Serial.printf("display: PIO%u SM%d DMA%d+%d; CYW43 not initialized (network pending)\n",
+  Serial.printf("display: PIO%u SM%d DMA%d+%d; CYW43 starts next\n",
                 pio_ == pio0 ? 0u : 1u, sm_, dataDma_, controlDma_);
+}
+
+void GalacticUnicornBoard::logRefreshProgress() const {
+  if (!ready_) { Serial.println("display: refresh unavailable after WiFi init"); return; }
+  const auto before = dma_hw->ch[dataDma_].read_addr;
+  const auto start = time_us_64();
+  bool advanced = false;
+  while (time_us_64() - start < 20000) {
+    if (dma_hw->ch[dataDma_].read_addr != before) { advanced = true; break; }
+    tight_loop_contents();
+  }
+  Serial.printf("display: PIO%u SM%d DMA%d+%d after WiFi: refresh %s\n",
+                pio_get_index(pio_), sm_, dataDma_, controlDma_,
+                advanced ? "advancing" : "NOT advancing");
 }
 
 int GalacticUnicornBoard::readLdrRaw() {

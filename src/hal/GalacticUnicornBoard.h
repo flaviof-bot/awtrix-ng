@@ -19,6 +19,8 @@ class GalacticUnicornBoard final : public IBoard {
   bool displayReady() const override { return ready_; }
   void begin() override;
   void show(const Canvas&) override;
+  // Logs whether the panel DMA still advances, after the radio has taken its PIO state machine.
+  void logRefreshProgress() const;
   void setBrightness(uint8_t brightness) override { brightness_ = brightness; updateGrade(); }
   // Only the drawing transforms apply; width, chaining and wiring are fixed by the hardware.
   void setMatrixLayout(const MatrixLayout& layout) override {

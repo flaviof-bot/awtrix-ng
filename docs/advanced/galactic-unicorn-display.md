@@ -23,10 +23,13 @@ One dynamically claimed PIO SM and two chained DMA channels continuously
 refresh fourteen binary-weighted bit planes without CPU refresh interrupts.
 PIO1 is preferred to leave PIO0 instruction memory for CYW43; allocation checks
 both free SMs and program space, and can fall back to PIO0. The startup log
-prints the actual display PIO/SM and DMA channels. The current bootstrap does
-**not initialize Wi-Fi**, so CYW43 has **no PIO assignment yet**. The network
-phase must log its actual assignment after initialization; no fixed SM is
-reserved or assumed by this driver.
+prints the actual display PIO/SM and DMA channels. The Pico variant's early
+`init_cyw43_wifi` call is deferred with a linker wrapper until after display
+startup. The radio log reports newly claimed PIO/SMs from the SDK allocation
+bitmap, without depending on CYW43's private bus structure. After the Wi-Fi join
+or AP startup, a bounded DMA-progress probe logs `refresh advancing` (or a
+failure). This checks DMA movement, not panel wiring or visual quality; check on
+the panel that the boot animation keeps moving while Wi-Fi connects.
 
 Two aligned 9,240-byte buffers (18,480 bytes total) fit in static RAM. `show()`
 packs the inactive buffer, publishes its aligned address, then waits until DMA
@@ -60,6 +63,50 @@ comes in M5b. The webhook and A+C boot rescue are separate milestones.
 | Volume up / down | 7 / 8 | NG volume |
 | Brightness up / down | 21 / 26 | NG brightness |
 | Light sensor | 28 (ADC2) | Automatic brightness |
+
+## Wi-Fi and setup
+
+The shared `NetworkService` loads stored Wi-Fi credentials and uses the same
+boot timeout (15 seconds by default), five-second reconnect checks and weak-signal
+roam policy as ESP32. The boot join is tried up to three times before the Pico
+falls back to the setup network: after an unclean reset the AP can still hold the
+old session and break off the first join mid key exchange. A join is only
+restarted once the previous one has had its full connect timeout. In provisioning
+mode the Pico retries the saved network every **60 seconds**, not 30: its one
+radio can only join on the AP's channel while the AP is up, so each retry stops
+the AP and captive DNS for one station-only join (up to the join timeout) and
+starts them again cleanly if it fails. The setup network disappearing for those
+seconds is expected. Retries pause while a phone is attached. Static IP uses
+Pico's different argument order and configures both DNS servers. Pico uses the
+core's worldwide country default rather than ESP32's country/scan/sort APIs.
+
+Lessons from real routers and mesh networks, kept on every join: radio power save
+is turned off (ESP32 parity, `WIFI_PS_NONE`), and the CYW43 firmware's own
+roaming is turned off (`roam_off=1`); roaming stays with the shared weak-signal
+policy. The radio reports an AP that breaks off one join mid key exchange the
+same way as a wrong password, so Wi-Fi `lastError` reads `badCredentials` only
+when two joins in a row were refused. Every CYW43 event is logged at debug level,
+and link-up logs the AP and RSSI.
+
+On a fresh boot without credentials, expect the boot logo followed by the
+animated rainbow **AP MODE** screen. A phone sees an open SSID
+**awtrixng-xxxxxx**, where `xxxxxx` is the last three MAC bytes in lowercase hex
+(or the configured hostname). DHCP and wildcard captive DNS use **192.168.4.1**.
+Hold **B / SELECT** for one second at boot to force this mode without erasing
+credentials (the 500 ms launcher hold only applies once the clock runs).
+An unset address reads `0.0.0.0`, as on ESP32.
+
+After a successful STA boot, mDNS publishes `<hostname>.local`, `_http._tcp`
+and `_awtrixng._tcp` on the configured web port (default 80), with the same
+`id` (lowercase MAC without colons), `name` and `type=awtrixng` TXT records.
+LEAmDNS is polled every loop. These records match ESP32, but **HTTP and its
+provisioning form are not wired yet** (M4b): joining the AP cannot save
+credentials yet and a phone may report no Internet/no working portal.
+
+Hardware acceptance: flash the UF2, check the SSID/AP MODE behavior above,
+capture display and CYW43 PIO/SM logs plus `refresh advancing`, then check the
+animated boot screen during a stored-credential join. Host tests and firmware
+builds cannot establish physical Wi-Fi/display coexistence.
 
 Host tests cannot establish physical refresh timing, orientation, or absence of
 visible tearing; check those on the panel with the CI-built UF2.

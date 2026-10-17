@@ -10,6 +10,9 @@
 #include "core/ScreenDisplay.h"
 #include "core/SettingsSaver.h"
 #include "core/apps/DefaultApps.h"
+#include "core/render/BootScreen.h"
+#include "core/render/ProvisioningScreen.h"
+#include "core/render/TextRenderer.h"
 #include "hal/BoardRegistry.h"
 #include "hal/GalacticUnicornBoard.h"
 #include "hal/IBoard.h"
@@ -20,9 +23,11 @@
 #include "persistence/NvsSettings.h"
 #include "platform/BuildFeatures.h"
 #include "platform/rp2040/PaletteFiles.h"
+#include "platform/rp2040/RadioStartup.h"
 #include "platform/rp2040/Rp2040Profile.h"
 #include "system/Log.h"
 #include "system/GalacticUnicornControls.h"
+#include "transport/net/NetworkService.h"
 
 #include <LittleFS.h>
 #include "system/MonotonicClock.h"
@@ -77,7 +82,28 @@ bool g_settingsDirty = false;
 SettingsSaver g_settingsSaver{-100000};
 std::unique_ptr<DefaultApps> g_builtinApps;
 std::unique_ptr<ApplicationRuntime> g_runtime;
+NetworkService g_net;
 std::string g_capabilities; // M4b: served by the HTTP API, M5b: published over MQTT.
+
+// Holding B (select) for one second at boot forces the provisioning AP without erasing the stored
+// credentials, as on the ESP32. The runtime hold of B (the launcher) only starts in loop().
+bool holdingSelectAtBoot() {
+  ButtonState buttons;
+  g_board->pollButtons(buttons);
+  if (!buttons.select) return false;
+  const unsigned long start = millis();
+  while (millis() - start < 1000) {
+    g_board->pollButtons(buttons);
+    if (!buttons.select) return false;
+    delay(20);
+  }
+  Canvas& canvas = g_runtime->canvas();
+  canvas.clear(0x000000u);
+  text::drawText(canvas, awtrixFont(), 0, 6, "SETUP", 0xFFA000u);
+  g_board->show(canvas);
+  logf("boot: SELECT held, forcing provisioning AP (credentials kept)");
+  return true;
+}
 
 PlatformDescriptor platformDescriptor() {
   PlatformDescriptor platform{"rp2040", {g_board->matrixWidth(), g_board->matrixHeight(), true},
@@ -146,9 +172,22 @@ void setup() {
   g_runtime->bindOutputs(*g_board, g_settingsDirty);
   g_runtime->engine().state().emit(StateEvent::SettingsChanged);
   g_capabilities = g_runtime->capabilitiesJson(platformDescriptor());
-  Serial.printf("boot: AWTRIX NG %s on %s (%dx%d); network pending\n",
+  Serial.printf("boot: AWTRIX NG %s on %s (%dx%d); PIO/DMA panel\n",
                 AWTRIX_NG_VERSION, g_board->name(), g_board->matrixWidth(),
                 g_board->matrixHeight());
+  const int64_t bootT0 = monotonicMs();
+  auto showBootLogo = [bootT0] {
+    render::drawBootLogo(g_runtime->canvas(), awtrixFont(), bootT0, monotonicMs());
+    g_board->show(g_runtime->canvas());
+  };
+  showBootLogo();
+  const bool forceAp = holdingSelectAtBoot();
+  // The radio takes its PIO state machine only now, after the panel owns its PIO and DMA.
+  platform::beginRadio();
+  // Joining a network from the provisioning AP reboots, so setup reruns with an address.
+  g_net.setOnJoinedFromAp([] { g_system.reboot(); });
+  g_net.begin(g_cfg, g_runtime->engine().state().runtime().wifi, forceAp, showBootLogo);
+  static_cast<GalacticUnicornBoard*>(g_board)->logRefreshProgress();
 }
 
 void loop() {
@@ -157,6 +196,7 @@ void loop() {
   g_controls.tick(g_runtime->engine(), unicorn.readInputs(), now);
   g_controls.sampleLight(g_runtime->engine(), unicorn.readLdrRaw(), now);
   g_runtime->beginFrame(now);
+  g_net.tick(static_cast<uint32_t>(now));
   // Collapses a burst of settings changes into one write; every write costs flash erase budget.
   if (g_settingsDirty && g_storageReady && !g_system.rebootPending && g_settingsSaver.due(now)) {
     nvs::saveSettings(g_runtime->engine().state().settings());
@@ -164,7 +204,11 @@ void loop() {
     g_settingsSaver.saved(now);
   }
   g_runtime->tick(now); // M6a: the script host.
-  g_runtime->render(now);
+  g_runtime->render(now, [](Canvas& canvas, int64_t frameMs, void*) {
+    if (!g_net.apMode()) return PlatformFrame::None;
+    render::drawProvisioningScreen(canvas, awtrixFont(), frameMs);
+    return PlatformFrame::Rendered;
+  });
   g_board->show(g_runtime->canvas());
   if (g_system.rebootPending && !g_runtime->powerBusy()) {
     // A requested reboot keeps pending settings, unless a reset just removed them.
