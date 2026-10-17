@@ -3,6 +3,7 @@
 #include "hal/GalacticUnicornDisplay.h"
 #include "hal/GalacticUnicornDefaults.h"
 #include <hardware/pio.h>
+#include "platform/rp2040/UnicornToneSink.h"
 
 namespace awtrix {
 DeviceConfig galacticUnicornDefaults();
@@ -36,7 +37,10 @@ class GalacticUnicornBoard final : public IBoard {
     out = {raw[0], raw[1], raw[2]};
   }
   std::array<bool, 9> readInputs() const;
-  sound::IToneSink* toneSink() override { return nullptr; }
+  // Initialize only after CYW43 so audio never steals the radio's PIO space.
+  void beginAudio() { tone_.begin(); }
+  // No sink when the PIO or DMA resources are missing: the amplifier stays muted.
+  sound::IToneSink* toneSink() override { return tone_.ready() ? &tone_ : nullptr; }
   sound::ITrackSink* trackSink() override { return nullptr; }
   ISensorBus& sensors() override { return sensors_; }
  private:
@@ -48,6 +52,7 @@ class GalacticUnicornBoard final : public IBoard {
     SensorReading read() override { return {}; }
     const char* sensorName() const override { return "none"; }
   } sensors_;
+  UnicornToneSink tone_;
   int height_ = 11;
   bool invalidHeight_ = false, ready_ = false;
   uint8_t brightness_ = 120;

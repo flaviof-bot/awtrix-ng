@@ -133,7 +133,7 @@ void postButton(const std::string& url, int button, bool state) {
   http.POST(reinterpret_cast<uint8_t*>(const_cast<char*>(body.data())), body.size());
   http.end();
 }
-sound::AudioRouter g_audio; // Null sinks honestly report MP3/radio unavailable.
+sound::AudioRouter g_audio; // The I2S tone sink only: no MP3, track or radio.
 ScreenDisplay g_display;
 PicoSystem g_system;
 SystemPageClock g_pageClock;
@@ -228,7 +228,6 @@ void setup() {
   sysconfig::adoptFixedBoard(g_cfg);
   logbuf::setVerbose(g_cfg.debugMode);
   g_board = &activeBoard(g_cfg);
-  g_audio.setTone(g_board->toneSink());
   g_audio.setTrack(g_board->trackSink());
   // Two independent decoders, as on ESP32, permit page transitions with icons.
   static DevicePageIcon pageIcon, pageIconB;
@@ -267,6 +266,9 @@ void setup() {
   // The radio takes its PIO state machine only now, after the panel owns its PIO and DMA.
   platform::beginRadio();
   watchdog::begin(); // filesystem mount and radio startup are complete
+  // The speaker's I2S takes what PIO and DMA the panel and radio left; without it, no tone sink.
+  static_cast<GalacticUnicornBoard*>(g_board)->beginAudio();
+  g_audio.setTone(g_board->toneSink());
   // Joining a network from the provisioning AP reboots, so setup reruns with an address.
   g_net.setOnJoinedFromAp([] { g_system.reboot(); });
   g_net.begin(g_cfg, g_runtime->engine().state().runtime().wifi, forceAp, showBootLogo);

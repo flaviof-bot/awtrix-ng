@@ -52,8 +52,8 @@ NG's median filter, light curve and automatic brightness policy.
 All nine keys are active low and debounced for 35 ms. B held for 500 ms opens
 the shared launcher; A/C step in it. Rotation and swapButtons follow ButtonRouter.
 D remains unmapped. Sleep, brightness and volume use the engine command path.
-Volume steps the master `volume` (0-100 %), which AudioRouter applies to every group, tones included; speaker wiring
-comes in M5b. The A+C boot rescue is a separate milestone.
+Volume steps the master `volume` (0-100 %), which AudioRouter applies to every group, tones included
+(see [Sound](#sound)). The A+C boot rescue is a separate milestone.
 
 | Input | GPIO | Function |
 |---|---|---|
@@ -208,6 +208,23 @@ wakes it. Wake restarts the application like ESP32 deep-sleep wake, but reports
 `software`, not `deepSleep`. The ordinary Sleep key display toggle remains
 separate and does not enter this timed sleep. Check timer wake and a
 release/new GPIO27 press on physical hardware.
+
+## Sound
+
+The Unicorn has an I2S amplifier and speaker instead of a buzzer, and plays the same RTTTL
+melodies a buzzer does. It is the router's tone sink: a notification's or `POST /api/v1/audio/play`'s
+`"sound": "name"` plays the saved melody `/MELODIES/name.txt`, and `"sound": {"rtttl": "..."}`
+plays the notes in the request. The melodies are rendered as 24 kHz, 16-bit square waves with the
+buzzer's pitch and note and rest lengths, and a 6 ms gap between notes, and streamed through
+arduino-pico's I2S (data GPIO 9, bit clock GPIO 10, word clock GPIO 11) with non-blocking writes,
+so sound never holds up the display or the watchdog. The master `volume`, the group volumes and
+the volume keys scale the output, including a melody that is playing.
+
+The amplifier enable (GPIO 22) is held low from boot, and whenever nothing plays or the heard
+volume is 0. If no PIO state machine or DMA channel is left for I2S, the amplifier stays muted and
+`/api/v1/capabilities` reports `rtttl` false. Otherwise it reports `rtttl` true, and `mp3`,
+`track`, `radio`, `song`, `speech`, `effect`, `url` and `clip` false: no MP3, DFPlayer track,
+radio or PCM sound. Listen on the hardware for the melodies, the volume keys and the idle mute.
 
 ## MQTT and Home Assistant
 
