@@ -166,6 +166,11 @@ const WIDGETS={
     return{input:sel,get:()=>cur,
       set:v=>{cur=TZRULE.has(v)?v:'UTC';sel.value=cur;preview();}};
   },
+  // Read-only values never become dirty or enter a settings update.
+  fixed(ctl,def,value){
+    ctl.append(el('span',{class:'mono'},(def.fmt?def.fmt(value):String(value))+(def.unit?' '+def.unit:'')));
+    return{input:null,get:()=>value,set:()=>{}};
+  },
   raw(ctl,def,value,onInput){
     const input=el('input',{type:'text',value:typeof value==='string'?value:JSON.stringify(value)});
     input.addEventListener('input',onInput);

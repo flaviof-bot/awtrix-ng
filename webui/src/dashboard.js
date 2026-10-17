@@ -64,7 +64,7 @@ function viewDash(view){
     setAuto(autoSw.input.checked);
   };
   api('/api/v1/settings').then(({data})=>{setAuto(!!data.autoBrightness);paintRot(data.autoTransition!==false);}).catch(()=>{});
-  if(S.light===null)api('/api/v1/capabilities').then(({data})=>{readAudioCaps(data||{});showAuto();}).catch(()=>{});
+  if(S.light===null)ensureCaps().then(showAuto).catch(()=>{});
   showAuto();
   const powerSw=mkSwitch(S.stats?!!S.stats.matrixPower:true,async()=>{
     try{await req('PATCH','/api/v1/display',{power:powerSw.input.checked});}catch(e){toastErr(e);}

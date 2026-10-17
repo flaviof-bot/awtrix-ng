@@ -1158,6 +1158,8 @@ const STR={
   pnBadWidth:'The total width must be between 32 and 128.',
   grpHw:'Brightness & sensors',grpHwH:'Auto-brightness limits and sensor calibration.',
   grpGpio:'GPIO',grpGpioH:'Which pin does what. Applies after a reboot.',
+  grpGpioFixedH:'Wired on the board, so they cannot be changed.',
+  grpPanelFixedH:'Built into the board: only the height and the orientation can change.',
   preset:'Preset wiring',presetH:'Fills the fields with a known board’s wiring.',
   presetUlanzi:'Ulanzi TC001',presetAwtrix2:'AWTRIX 2 mainboard',
   presetApplied:'Preset filled in. Check and save.',
@@ -1506,6 +1508,7 @@ const S={transitions:[],stats:null,ap:false,sysHost:'',sysUid:'',gpio:null,aud:n
   scriptsOff:null,display:null,gpioKnown:false,light:null,caps:null};
 function readAudioCaps(caps){
   S.caps=caps;
+  S.scripting=caps.scripting!==false;
   const a=caps.audio||{};
   S.aud={rtttl:a.rtttl===true,track:a.track===true,mp3:a.mp3===true,radio:a.radio===true};
   S.microphone=caps.microphone===true;
@@ -1589,6 +1592,19 @@ const hubLink=(path,label,cls)=>{
 // Unknown counts as present, so nothing is hidden before the capabilities have arrived.
 const hasSink=(...k)=>!S.aud||k.some(x=>S.aud[x]);
 const anyAudioCap=()=>hasSink('rtttl','track','mp3','radio');
+const hasScripting=()=>S.scripting!==false;
+const unavailableNote=()=>'Not available on this board.';
+// Share the initial request across startup and direct routes; a failed request may be retried.
+let capsPending=null;
+async function ensureCaps(){
+  if(S.caps)return S.caps;
+  if(!capsPending)capsPending=api('/api/v1/capabilities').then(({data})=>{
+    const caps=data||{};
+    S.transitions=caps.transitions||[];
+    readAudioCaps(caps);nav();return caps;
+  }).finally(()=>{capsPending=null;});
+  return capsPending;
+}
 const hasLight=()=>S.light!==false;
 const LIGHT_KEYS=['minBrightness','maxBrightness','ldrFactor','ldrGamma','ldrOnGround','brightnessSmoothing'];
 async function scriptsOff(){
@@ -1619,6 +1635,22 @@ function applyGpioCaps(c){
   opts('pinDfRx',usable,true);
   const i2s=dflt.pinI2sBclk>=0?'gpio':'hidden';
   ['pinI2sBclk','pinI2sLrclk','pinI2sDout','pinI2sMclk','pinAmpEnable'].forEach(k=>{SYSF[k].g=i2s;});
+  if(c.fixed)applyFixedBoard(c);
+}
+function applyFixedBoard(c){
+  const d=c.defaults||{},hide=keys=>keys.forEach(k=>{(SYSF[k]||FIELDS[k]).g='hidden';});
+  PINKEYS.forEach(k=>{SYSF[k].w='fixed';SYSF[k].g=d[k]>=0?'gpio':'hidden';});
+  SYSF.pinI2sBclk.h='The built-in speaker amplifier, bit clock.';
+  SYSF.pinI2sLrclk.h='Same amplifier, word select.';
+  SYSF.pinI2sDout.h='Same amplifier, data.';
+  hide(['ldrOnGround']);
+  if(d.pinDfRx<0)hide(['dfplayer']);
+  if(d.pinBattery<0)hide(['batteryDividerRatio','lowBatteryThreshold']);
+  if(d.pinI2cSda<0)hide(['tempOffset','humOffset','tempDecimals']);
+  if(!c.panel)return;
+  SYSF.panelWidth.w=SYSF.panels.w='fixed';
+  hide(['panelStart','panelWiring','panelColorOrder','panelSerpentine','panelChainReverse','panelChainSerpentine']);
+  Object.assign(SYSF.panelHeight,{w:'select',opt:c.panel.heights.map(h=>[h,h+' px'])});
 }
 const PINKEYS=['pinMatrix','pinBtnLeft','pinBtnSelect','pinBtnRight','pinBattery','pinLdr',
   'pinBuzzer','pinI2cSda','pinI2cScl','pinDfRx','pinDfTx','pinI2sBclk','pinI2sLrclk','pinI2sDout',
@@ -1695,7 +1727,7 @@ function currentRoute(){
 function nav(){
   const cur=currentRoute(),bar=$('#nav');
   const tabs=(S.ap?TABS.filter(([r])=>r==='system')
-    :TABS.filter(([r])=>r!=='audio'||anyAudioCap())).map(([r,k])=>['#/'+r,t(k)]);
+    :TABS.filter(([r])=>(r!=='audio'||anyAudioCap())&&(r!=='scripts'||hasScripting()))).map(([r,k])=>['#/'+r,t(k)]);
   bar.setAttribute('aria-label',t('mainnav'));
   const links=[...bar.children];
   if(links.length!==tabs.length||links.some((a,i)=>a.getAttribute('href')!==tabs[i][0]||a.textContent!==tabs[i][1]))
@@ -1903,6 +1935,11 @@ const WIDGETS={
     ctl.append(el('div',{class:'tzctl'},el('div',{class:'tzrow'},detect,sel),prev));
     return{input:sel,get:()=>cur,
       set:v=>{cur=TZRULE.has(v)?v:'UTC';sel.value=cur;preview();}};
+  },
+  // Read-only values never become dirty or enter a settings update.
+  fixed(ctl,def,value){
+    ctl.append(el('span',{class:'mono'},(def.fmt?def.fmt(value):String(value))+(def.unit?' '+def.unit:'')));
+    return{input:null,get:()=>value,set:()=>{}};
   },
   raw(ctl,def,value,onInput){
     const input=el('input',{type:'text',value:typeof value==='string'?value:JSON.stringify(value)});
@@ -2232,7 +2269,7 @@ function viewDash(view){
     setAuto(autoSw.input.checked);
   };
   api('/api/v1/settings').then(({data})=>{setAuto(!!data.autoBrightness);paintRot(data.autoTransition!==false);}).catch(()=>{});
-  if(S.light===null)api('/api/v1/capabilities').then(({data})=>{readAudioCaps(data||{});showAuto();}).catch(()=>{});
+  if(S.light===null)ensureCaps().then(showAuto).catch(()=>{});
   showAuto();
   const powerSw=mkSwitch(S.stats?!!S.stats.matrixPower:true,async()=>{
     try{await req('PATCH','/api/v1/display',{power:powerSw.input.checked});}catch(e){toastErr(e);}
@@ -3178,7 +3215,14 @@ function scriptRequiresDone(name,res){
 }
 // HUB SCRIPT UPDATES END
 
-function viewScripts(view){
+async function viewScripts(view){
+  const generation=gen;
+  try{await ensureCaps();}
+  catch(e){view.append(el('div',{class:'card wide'},t('neterr')));return;}
+  if(generation!==gen)return;
+  if(!hasScripting()){
+    view.append(el('div',{class:'card wide'},t('grpScript')+': '+unavailableNote()));return;
+  }
   const ed=mkCodeEditor();
   const nameIn=el('input',{type:'text',placeholder:t('name'),maxlength:'32',spellcheck:'false',
     pattern:'[A-Za-z0-9_-]{1,32}'});
@@ -3577,7 +3621,7 @@ function viewScripts(view){
     const generation=++checkGeneration;
     checkHubBtn.disabled=true;checkHubBtn.textContent=t('suChecking');
     const files=allFiles().slice(),releases=new Map();
-    if(!S.caps)try{readAudioCaps((await api('/api/v1/capabilities')).data||{});}catch(e){}
+    if(!S.caps)try{await ensureCaps();}catch(e){}
     async function worker(){
       while(files.length&&generation===checkGeneration&&view.isConnected){
         const file=files.shift(),url='/api/v1/apps/script/'+encodeURIComponent(file.name);
@@ -3934,11 +3978,7 @@ function mergeDisplayData(settings,display){
 async function viewDisplay(view){
   let data;
   try{
-    if(!S.transitions.length||!S.aud){
-      const caps=(await api('/api/v1/capabilities')).data||{};
-      if(!S.transitions.length)S.transitions=caps.transitions||[];
-      if(!S.aud)readAudioCaps(caps);
-    }
+    await ensureCaps();
     data=mergeDisplayData((await api('/api/v1/settings')).data,(await api('/api/v1/display')).data);
   }catch(e){view.append(el('div',{class:'card wide'},t('neterr')));return;}
   FIELDS.autoBrightness.g=hasLight()?'bright':'hidden';
@@ -3969,13 +4009,7 @@ async function viewSystem(view){
   try{data=(await api('/api/v1/system')).data;}
   catch(e){view.append(el('div',{class:'card wide'},t('neterr')));return;}
   if(!S.sysHost){try{setStats((await api('/api/v1/device',{timeout:4000})).data);}catch(e){}}
-  if(!S.gpioKnown||!S.aud){
-    try{
-      const caps=(await api('/api/v1/capabilities')).data||{};
-      readAudioCaps(caps);
-    }catch(e){}
-    if(S.gpio)applyGpioCaps(S.gpio);
-  }
+  try{await ensureCaps();}catch(e){}
   LIGHT_KEYS.forEach(k=>SYSF[k].g=hasLight()?'hw':'hidden');
   SYSF.dfplayer.g=data.pinDfRx>=0&&data.pinDfTx>=0?'sndhw':'hidden';
   //linux:begin
@@ -3994,7 +4028,10 @@ async function viewSystem(view){
     //linux:end
   }
   ['wifiPass','mqttPass','authPass'].forEach(k=>{if(!(k in data))data[k]='';});
+  SYSF.scriptingEnabled.g=hasScripting()?'script':'hidden';
+  if(S.gpio?.fixed)applyFixedBoard(S.gpio);
   (S.ap?provisioningPage:systemPage)(view,data);
+  if(!S.ap&&!hasScripting())view.append(el('div',{class:'card wide'},t('grpScript')+': '+unavailableNote()));
 }
 function systemSettingsPage(view,data){
   const rbBtn=el('button',{class:'pri'},t('rebootnow'));
@@ -4036,9 +4073,12 @@ function systemPage(view,data){
   if(TZRULE.get(data.tzName)!==data.tz)
     data.tzName=TZFIRST.get(data.tz)||'UTC';
   const page=systemSettingsPage(view,data);
+  const fixed=!!S.gpio?.fixed;
   const groups=SYS_GROUPS.filter(([id])=>
     (id!=='panel'||S.display?.configurable!==false)&&
-    (id!=='gpio'||!S.gpioKnown||S.gpio!==null));
+    (id!=='gpio'||!S.gpioKnown||S.gpio!==null)).map(g=>
+      fixed&&g[0]==='gpio'?['gpio','grpGpio','grpGpioFixedH']:
+      fixed&&g[0]==='panel'?['panel','grpPanel','grpPanelFixedH']:g);
   const sysFields=renderSettingsInto(page,data,SYSF,groups);
   if(S.display?.configurable===false)
     page.section('panel',t('grpPanel'),'',
@@ -4102,10 +4142,16 @@ function systemPage(view,data){
     gpioSec.querySelector('.rows').prepend(
       actionRow(t('preset'),t('presetH'),[presetBtn(t('presetUlanzi'),'ulanzi'),presetBtn(t('presetAwtrix2'),'awtrix2')]));
   }
+  const fixedRows=fixed?page.panel.querySelector('#sec-gpio .rows'):null;
+  if(fixedRows&&(S.gpio.reserved||[]).length){
+    const why=new Map();
+    S.gpio.reserved.forEach(r=>why.set(r.why,(why.get(r.why)||[]).concat(r.lo===r.hi?r.lo:r.lo+'–'+r.hi)));
+    fixedRows.append(actionRow('Reserved',[...why].map(([w,p])=>'GPIO '+p.join(', ')+': '+w).join(' · '),[]));
+  }
   if(S.gpio){
     page.onUpdate.push(()=>paintPinUse(sysFields));
     const sel=sysFields.pinBtnSelect;
-    if(sel&&S.gpio.rtc){
+    if(sel&&S.gpio.rtc&&!fixed){
       const note=el('div',{class:'help'});
       sel.row.querySelector('.lab').append(note);
       page.onUpdate.push(()=>paintWakePin(sysFields,note));
@@ -4494,6 +4540,9 @@ function updAvailable(c){
   const run=S.stats&&S.stats.version;
   return c&&c.usable&&run&&verNewer(c.version,run)?c:null;
 }
+// Keep TC002's existing .awup path; only Pico UF2s require BOOTSEL instead.
+const OTA_IMAGES=['firmware-awtrix-ng.bin','firmware-awtrix-ng-s3-octal.bin','firmware-awtrix-ng-s3-quad.bin','awtrix-ng-tc002.awup'];
+const browserUpdate=()=>{const img=S.stats&&S.stats.updateImage;return !img||OTA_IMAGES.includes(img);};
 async function downloadFirmware(release,onProgress){
   const image=S.stats&&S.stats.updateImage;
   const awup=image==='awtrix-ng-tc002.awup';
@@ -4540,7 +4589,10 @@ function updateRow(install){
       const img=S.stats&&S.stats.updateImage;
       if(avail){
         status.textContent=t('updnew').replace('{v}',avail.version)+(avail.published?' ('+avail.published+')':'');
-        if(img&&avail.assets[img]){available=avail;installBtn.disabled=false;}
+        if(img&&avail.assets[img]){
+          if(browserUpdate()){available=avail;installBtn.disabled=false;}
+          else status.textContent+=' – install its .uf2 over USB.';
+        }
         notes.hidden=!avail.notes;
         if(!notes.hidden)notes.href=avail.notes;
       }else{
@@ -4615,7 +4667,8 @@ function maintenanceSection(page){
   });
   page.section('maint',t('maint'),t('mainthelp'),[
     updateRow(installFirmware),
-    actionRow(awup?t('fwfile').replace('.bin','.awup'):t('fwfile'),null,[fwBtn,fwIn]),
+    browserUpdate()?actionRow(awup?t('fwfile').replace('.bin','.awup'):t('fwfile'),null,[fwBtn,fwIn])
+      :actionRow('Install firmware','This board updates over USB: hold BOOTSEL while plugging it in, then copy the .uf2 onto the drive that appears.',[]),
     fwStatus,fw.row,
     actionRow(t('reboot'),null,[rebootBtn]),
     actionRow(t('resetset'),t('resetsetH'),[resetBtn]),
@@ -5691,12 +5744,15 @@ const heardRow=d=>d.alert?.playing?d.alert.name:d.app?.playing&&d.app.name.inclu
 async function viewAudio(view){
   const g=gen;
   if(!S.aud){
-    try{readAudioCaps((await api('/api/v1/capabilities')).data||{});}
+    try{await ensureCaps();}
     catch(e){view.append(el('div',{class:'card wide'},t('neterr')));return;}
     if(g!==gen)return;
   }
   if(!anyAudioCap()){view.append(el('div',{class:'card wide'},t('audnone')));return;}
   const{section,panel}=sectionShell(view);
+  const missing=['mp3','radio'].filter(k=>!hasSink(k));
+  if(missing.length)panel.prepend(el('div',{class:'ghelp'},
+    missing.map(k=>k==='mp3'?'MP3':t('radioTab')).join(', ')+': '+unavailableNote()));
   const vols=[];
   const slider=key=>{
     let timer=null,held=false,edits=0;
@@ -6263,13 +6319,11 @@ new ResizeObserver(setChromeH).observe(topbar);
   }catch(e){}
   render();
   try{
-    const caps=(await api('/api/v1/capabilities')).data||{};
-    if(!S.transitions.length)S.transitions=caps.transitions||[];
-    readAudioCaps(caps);
+    await ensureCaps();
     //linux:begin
     if(S.oauth&&/^#oauth(_error)?=/.test(location.hash))oauthReturn();
     //linux:end
-    if(!anyAudioCap())nav();
+    nav();
   }catch(e){}
 })();
 }

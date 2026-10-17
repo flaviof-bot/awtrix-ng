@@ -14,13 +14,11 @@ new ResizeObserver(setChromeH).observe(topbar);
   }catch(e){}
   render();
   try{
-    const caps=(await api('/api/v1/capabilities')).data||{};
-    if(!S.transitions.length)S.transitions=caps.transitions||[];
-    readAudioCaps(caps);
+    await ensureCaps();
     //linux:begin
     if(S.oauth&&/^#oauth(_error)?=/.test(location.hash))oauthReturn();
     //linux:end
-    if(!anyAudioCap())nav();
+    nav();
   }catch(e){}
 })();
 }

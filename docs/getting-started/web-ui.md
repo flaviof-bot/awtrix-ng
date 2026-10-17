@@ -48,7 +48,9 @@ own address, so you can bookmark it:
 | **System** | `#/system` | Wi-Fi, MQTT, time, hardware, updates, backup |
 | **Log** | `#/log` | Live device log |
 
-The web UI shows only what your device can do.<!-- only esp32 esp32-s3 --> For example, the **Audio** tab is missing on a
+The web UI shows only what your device can do. Without scripting support, it hides the **Scripts**
+tab and **Run scripts** setting. Opening the Scripts address shows **Not available on this board**
+instead. The Audio page names missing MP3 and radio outputs.<!-- only esp32 esp32-s3 --> For example, the **Audio** tab is missing on a
 device with neither a buzzer nor a speaker.<!-- /only -->
 
 ## Dashboard

@@ -219,6 +219,8 @@ const STR={
   pnBadWidth:'The total width must be between 32 and 128.',
   grpHw:'Brightness & sensors',grpHwH:'Auto-brightness limits and sensor calibration.',
   grpGpio:'GPIO',grpGpioH:'Which pin does what. Applies after a reboot.',
+  grpGpioFixedH:'Wired on the board, so they cannot be changed.',
+  grpPanelFixedH:'Built into the board: only the height and the orientation can change.',
   preset:'Preset wiring',presetH:'Fills the fields with a known board’s wiring.',
   presetUlanzi:'Ulanzi TC001',presetAwtrix2:'AWTRIX 2 mainboard',
   presetApplied:'Preset filled in. Check and save.',

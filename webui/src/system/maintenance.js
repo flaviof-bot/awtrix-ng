@@ -44,6 +44,9 @@ function updAvailable(c){
   const run=S.stats&&S.stats.version;
   return c&&c.usable&&run&&verNewer(c.version,run)?c:null;
 }
+// Keep TC002's existing .awup path; only Pico UF2s require BOOTSEL instead.
+const OTA_IMAGES=['firmware-awtrix-ng.bin','firmware-awtrix-ng-s3-octal.bin','firmware-awtrix-ng-s3-quad.bin','awtrix-ng-tc002.awup'];
+const browserUpdate=()=>{const img=S.stats&&S.stats.updateImage;return !img||OTA_IMAGES.includes(img);};
 async function downloadFirmware(release,onProgress){
   const image=S.stats&&S.stats.updateImage;
   const awup=image==='awtrix-ng-tc002.awup';
@@ -90,7 +93,10 @@ function updateRow(install){
       const img=S.stats&&S.stats.updateImage;
       if(avail){
         status.textContent=t('updnew').replace('{v}',avail.version)+(avail.published?' ('+avail.published+')':'');
-        if(img&&avail.assets[img]){available=avail;installBtn.disabled=false;}
+        if(img&&avail.assets[img]){
+          if(browserUpdate()){available=avail;installBtn.disabled=false;}
+          else status.textContent+=' – install its .uf2 over USB.';
+        }
         notes.hidden=!avail.notes;
         if(!notes.hidden)notes.href=avail.notes;
       }else{
@@ -165,7 +171,8 @@ function maintenanceSection(page){
   });
   page.section('maint',t('maint'),t('mainthelp'),[
     updateRow(installFirmware),
-    actionRow(awup?t('fwfile').replace('.bin','.awup'):t('fwfile'),null,[fwBtn,fwIn]),
+    browserUpdate()?actionRow(awup?t('fwfile').replace('.bin','.awup'):t('fwfile'),null,[fwBtn,fwIn])
+      :actionRow('Install firmware','This board updates over USB: hold BOOTSEL while plugging it in, then copy the .uf2 onto the drive that appears.',[]),
     fwStatus,fw.row,
     actionRow(t('reboot'),null,[rebootBtn]),
     actionRow(t('resetset'),t('resetsetH'),[resetBtn]),

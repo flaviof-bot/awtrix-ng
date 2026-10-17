@@ -11,11 +11,7 @@ function mergeDisplayData(settings,display){
 async function viewDisplay(view){
   let data;
   try{
-    if(!S.transitions.length||!S.aud){
-      const caps=(await api('/api/v1/capabilities')).data||{};
-      if(!S.transitions.length)S.transitions=caps.transitions||[];
-      if(!S.aud)readAudioCaps(caps);
-    }
+    await ensureCaps();
     data=mergeDisplayData((await api('/api/v1/settings')).data,(await api('/api/v1/display')).data);
   }catch(e){view.append(el('div',{class:'card wide'},t('neterr')));return;}
   FIELDS.autoBrightness.g=hasLight()?'bright':'hidden';
@@ -46,13 +42,7 @@ async function viewSystem(view){
   try{data=(await api('/api/v1/system')).data;}
   catch(e){view.append(el('div',{class:'card wide'},t('neterr')));return;}
   if(!S.sysHost){try{setStats((await api('/api/v1/device',{timeout:4000})).data);}catch(e){}}
-  if(!S.gpioKnown||!S.aud){
-    try{
-      const caps=(await api('/api/v1/capabilities')).data||{};
-      readAudioCaps(caps);
-    }catch(e){}
-    if(S.gpio)applyGpioCaps(S.gpio);
-  }
+  try{await ensureCaps();}catch(e){}
   LIGHT_KEYS.forEach(k=>SYSF[k].g=hasLight()?'hw':'hidden');
   SYSF.dfplayer.g=data.pinDfRx>=0&&data.pinDfTx>=0?'sndhw':'hidden';
   //linux:begin
@@ -71,7 +61,10 @@ async function viewSystem(view){
     //linux:end
   }
   ['wifiPass','mqttPass','authPass'].forEach(k=>{if(!(k in data))data[k]='';});
+  SYSF.scriptingEnabled.g=hasScripting()?'script':'hidden';
+  if(S.gpio?.fixed)applyFixedBoard(S.gpio);
   (S.ap?provisioningPage:systemPage)(view,data);
+  if(!S.ap&&!hasScripting())view.append(el('div',{class:'card wide'},t('grpScript')+': '+unavailableNote()));
 }
 function systemSettingsPage(view,data){
   const rbBtn=el('button',{class:'pri'},t('rebootnow'));
@@ -113,9 +106,12 @@ function systemPage(view,data){
   if(TZRULE.get(data.tzName)!==data.tz)
     data.tzName=TZFIRST.get(data.tz)||'UTC';
   const page=systemSettingsPage(view,data);
+  const fixed=!!S.gpio?.fixed;
   const groups=SYS_GROUPS.filter(([id])=>
     (id!=='panel'||S.display?.configurable!==false)&&
-    (id!=='gpio'||!S.gpioKnown||S.gpio!==null));
+    (id!=='gpio'||!S.gpioKnown||S.gpio!==null)).map(g=>
+      fixed&&g[0]==='gpio'?['gpio','grpGpio','grpGpioFixedH']:
+      fixed&&g[0]==='panel'?['panel','grpPanel','grpPanelFixedH']:g);
   const sysFields=renderSettingsInto(page,data,SYSF,groups);
   if(S.display?.configurable===false)
     page.section('panel',t('grpPanel'),'',
@@ -179,10 +175,16 @@ function systemPage(view,data){
     gpioSec.querySelector('.rows').prepend(
       actionRow(t('preset'),t('presetH'),[presetBtn(t('presetUlanzi'),'ulanzi'),presetBtn(t('presetAwtrix2'),'awtrix2')]));
   }
+  const fixedRows=fixed?page.panel.querySelector('#sec-gpio .rows'):null;
+  if(fixedRows&&(S.gpio.reserved||[]).length){
+    const why=new Map();
+    S.gpio.reserved.forEach(r=>why.set(r.why,(why.get(r.why)||[]).concat(r.lo===r.hi?r.lo:r.lo+'–'+r.hi)));
+    fixedRows.append(actionRow('Reserved',[...why].map(([w,p])=>'GPIO '+p.join(', ')+': '+w).join(' · '),[]));
+  }
   if(S.gpio){
     page.onUpdate.push(()=>paintPinUse(sysFields));
     const sel=sysFields.pinBtnSelect;
-    if(sel&&S.gpio.rtc){
+    if(sel&&S.gpio.rtc&&!fixed){
       const note=el('div',{class:'help'});
       sel.row.querySelector('.lab').append(note);
       page.onUpdate.push(()=>paintWakePin(sysFields,note));

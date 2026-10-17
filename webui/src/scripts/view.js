@@ -1,5 +1,12 @@
 
-function viewScripts(view){
+async function viewScripts(view){
+  const generation=gen;
+  try{await ensureCaps();}
+  catch(e){view.append(el('div',{class:'card wide'},t('neterr')));return;}
+  if(generation!==gen)return;
+  if(!hasScripting()){
+    view.append(el('div',{class:'card wide'},t('grpScript')+': '+unavailableNote()));return;
+  }
   const ed=mkCodeEditor();
   const nameIn=el('input',{type:'text',placeholder:t('name'),maxlength:'32',spellcheck:'false',
     pattern:'[A-Za-z0-9_-]{1,32}'});
@@ -398,7 +405,7 @@ function viewScripts(view){
     const generation=++checkGeneration;
     checkHubBtn.disabled=true;checkHubBtn.textContent=t('suChecking');
     const files=allFiles().slice(),releases=new Map();
-    if(!S.caps)try{readAudioCaps((await api('/api/v1/capabilities')).data||{});}catch(e){}
+    if(!S.caps)try{await ensureCaps();}catch(e){}
     async function worker(){
       while(files.length&&generation===checkGeneration&&view.isConnected){
         const file=files.shift(),url='/api/v1/apps/script/'+encodeURIComponent(file.name);

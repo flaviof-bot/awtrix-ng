@@ -562,11 +562,13 @@ async function scriptsLink() {
       if (String(url) === '/api/v1/capabilities') await held;
       return device(url, o);
     };
-    await openScript(late.window, 'Plain');
-    assert.equal(soundLink(late.window)?.getAttribute('aria-label'), tr(late.window, 'sndAdd'), 'before the capabilities arrive, the button is there');
+    await goto(late.window, '#/scripts');
+    await flush(250);
+    assert.equal($(late.window, 'textarea'), null, 'the editor waits for scripting capability');
     release();
     await flush(200);
-    assert.equal(soundLink(late.window), undefined, 'and it goes once they say the clock plays no MP3s');
+    await openScript(late.window, 'Plain');
+    assert.equal(soundLink(late.window), undefined, 'the link is absent once capabilities say no MP3');
   } finally { late.window.close(); }
 }
 

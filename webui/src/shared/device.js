@@ -3,6 +3,7 @@ const S={transitions:[],stats:null,ap:false,sysHost:'',sysUid:'',gpio:null,aud:n
   scriptsOff:null,display:null,gpioKnown:false,light:null,caps:null};
 function readAudioCaps(caps){
   S.caps=caps;
+  S.scripting=caps.scripting!==false;
   const a=caps.audio||{};
   S.aud={rtttl:a.rtttl===true,track:a.track===true,mp3:a.mp3===true,radio:a.radio===true};
   S.microphone=caps.microphone===true;
@@ -86,6 +87,19 @@ const hubLink=(path,label,cls)=>{
 // Unknown counts as present, so nothing is hidden before the capabilities have arrived.
 const hasSink=(...k)=>!S.aud||k.some(x=>S.aud[x]);
 const anyAudioCap=()=>hasSink('rtttl','track','mp3','radio');
+const hasScripting=()=>S.scripting!==false;
+const unavailableNote=()=>'Not available on this board.';
+// Share the initial request across startup and direct routes; a failed request may be retried.
+let capsPending=null;
+async function ensureCaps(){
+  if(S.caps)return S.caps;
+  if(!capsPending)capsPending=api('/api/v1/capabilities').then(({data})=>{
+    const caps=data||{};
+    S.transitions=caps.transitions||[];
+    readAudioCaps(caps);nav();return caps;
+  }).finally(()=>{capsPending=null;});
+  return capsPending;
+}
 const hasLight=()=>S.light!==false;
 const LIGHT_KEYS=['minBrightness','maxBrightness','ldrFactor','ldrGamma','ldrOnGround','brightnessSmoothing'];
 async function scriptsOff(){
@@ -116,6 +130,22 @@ function applyGpioCaps(c){
   opts('pinDfRx',usable,true);
   const i2s=dflt.pinI2sBclk>=0?'gpio':'hidden';
   ['pinI2sBclk','pinI2sLrclk','pinI2sDout','pinI2sMclk','pinAmpEnable'].forEach(k=>{SYSF[k].g=i2s;});
+  if(c.fixed)applyFixedBoard(c);
+}
+function applyFixedBoard(c){
+  const d=c.defaults||{},hide=keys=>keys.forEach(k=>{(SYSF[k]||FIELDS[k]).g='hidden';});
+  PINKEYS.forEach(k=>{SYSF[k].w='fixed';SYSF[k].g=d[k]>=0?'gpio':'hidden';});
+  SYSF.pinI2sBclk.h='The built-in speaker amplifier, bit clock.';
+  SYSF.pinI2sLrclk.h='Same amplifier, word select.';
+  SYSF.pinI2sDout.h='Same amplifier, data.';
+  hide(['ldrOnGround']);
+  if(d.pinDfRx<0)hide(['dfplayer']);
+  if(d.pinBattery<0)hide(['batteryDividerRatio','lowBatteryThreshold']);
+  if(d.pinI2cSda<0)hide(['tempOffset','humOffset','tempDecimals']);
+  if(!c.panel)return;
+  SYSF.panelWidth.w=SYSF.panels.w='fixed';
+  hide(['panelStart','panelWiring','panelColorOrder','panelSerpentine','panelChainReverse','panelChainSerpentine']);
+  Object.assign(SYSF.panelHeight,{w:'select',opt:c.panel.heights.map(h=>[h,h+' px'])});
 }
 const PINKEYS=['pinMatrix','pinBtnLeft','pinBtnSelect','pinBtnRight','pinBattery','pinLdr',
   'pinBuzzer','pinI2cSda','pinI2cScl','pinDfRx','pinDfTx','pinI2sBclk','pinI2sLrclk','pinI2sDout',

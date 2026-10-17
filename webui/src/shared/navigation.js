@@ -32,7 +32,7 @@ function currentRoute(){
 function nav(){
   const cur=currentRoute(),bar=$('#nav');
   const tabs=(S.ap?TABS.filter(([r])=>r==='system')
-    :TABS.filter(([r])=>r!=='audio'||anyAudioCap())).map(([r,k])=>['#/'+r,t(k)]);
+    :TABS.filter(([r])=>(r!=='audio'||anyAudioCap())&&(r!=='scripts'||hasScripting()))).map(([r,k])=>['#/'+r,t(k)]);
   bar.setAttribute('aria-label',t('mainnav'));
   const links=[...bar.children];
   if(links.length!==tabs.length||links.some((a,i)=>a.getAttribute('href')!==tabs[i][0]||a.textContent!==tabs[i][1]))

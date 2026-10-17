@@ -421,12 +421,15 @@ const heardRow=d=>d.alert?.playing?d.alert.name:d.app?.playing&&d.app.name.inclu
 async function viewAudio(view){
   const g=gen;
   if(!S.aud){
-    try{readAudioCaps((await api('/api/v1/capabilities')).data||{});}
+    try{await ensureCaps();}
     catch(e){view.append(el('div',{class:'card wide'},t('neterr')));return;}
     if(g!==gen)return;
   }
   if(!anyAudioCap()){view.append(el('div',{class:'card wide'},t('audnone')));return;}
   const{section,panel}=sectionShell(view);
+  const missing=['mp3','radio'].filter(k=>!hasSink(k));
+  if(missing.length)panel.prepend(el('div',{class:'ghelp'},
+    missing.map(k=>k==='mp3'?'MP3':t('radioTab')).join(', ')+': '+unavailableNote()));
   const vols=[];
   const slider=key=>{
     let timer=null,held=false,edits=0;

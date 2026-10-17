@@ -95,7 +95,7 @@ function makeStore() {
     dataPatch: null,
     // Last PATCH /api/v1/settings body; the store itself is updated with it too.
     settingsPatch: null,
-    system: { hostname: 'awtrix-ng' },
+    system: { hostname: 'awtrix-ng', scriptingEnabled: true },
     screen: null,
     // What GET /api/v1/capabilities answers; override before goto() to test gating.
     caps: { transitions: [],
@@ -457,12 +457,22 @@ function putSound(store, script, file, data) {
   store.sounds.get(script).set(file, { size: Buffer.byteLength(data), sha256: createHash('sha256').update(data).digest('hex'), data });
 }
 
+const delayed = (fetchImpl, delays) => window => {
+  const fetch = fetchImpl(window);
+  return (url, opts) => {
+    const ms = delays && delays[new URL(url, 'http://localhost').pathname];
+    return ms ? new Promise(r => setTimeout(() => r(fetch(url, opts)), ms)) : fetch(url, opts);
+  };
+};
+
 async function boot(opts) {
   const store = makeStore();
   // The boot IIFE fetches capabilities immediately, so a test that wants
   // different caps has to hand them in before the page comes up.
   if (opts && 'caps' in opts) store.caps = opts.caps;
-  if (opts && 'system' in opts) store.system = opts.system;
+  if (opts && 'system' in opts) Object.assign(store.system, opts.system);
+  if (opts && 'settings' in opts) Object.assign(store.settings, opts.settings);
+  if (opts && 'display' in opts) Object.assign(store.display, opts.display);
   if (opts && 'screen' in opts) store.screen = opts.screen;
   if (opts && 'device' in opts) Object.assign(store.device, opts.device);
   // oauth(method, path, body) answers /api/v1/oauth... with [json, status].
@@ -474,7 +484,7 @@ async function boot(opts) {
     pretendToBeVisual: true,
     url: (opts && opts.url) || 'http://localhost/',
     virtualConsole: makeVirtualConsole(),
-    beforeParse: installGlobals(window => mockFetch(store, netlog, window), opts && opts.canvasContext),
+    beforeParse: installGlobals(delayed(window => mockFetch(store, netlog, window), opts && opts.delays), opts && opts.canvasContext),
   });
   await flush(60); // boot render() + device/capabilities/system fetches
   return { dom, window: dom.window, store, netlog };
