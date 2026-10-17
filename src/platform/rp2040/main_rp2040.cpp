@@ -8,13 +8,21 @@
 #include "core/FrameClock.h"
 #include "core/PlatformDescriptor.h"
 #include "core/ScreenDisplay.h"
+#include "core/SettingsSaver.h"
 #include "core/apps/DefaultApps.h"
 #include "hal/BoardRegistry.h"
 #include "hal/GalacticUnicornBoard.h"
 #include "hal/IBoard.h"
 #include "media/AwtrixFontAdapter.h"
+#include "persistence/AppOrderStore.h"
+#include "persistence/Filesystem.h"
+#include "persistence/NvsSettings.h"
 #include "platform/BuildFeatures.h"
+#include "platform/rp2040/PaletteFiles.h"
 #include "platform/rp2040/Rp2040Profile.h"
+#include "system/Log.h"
+
+#include <LittleFS.h>
 #include "system/MonotonicClock.h"
 
 // Feature macros describe this build, not a claim that a runtime service exists.
@@ -34,14 +42,22 @@ class UnsetClock final : public IPageClock {
   }
 };
 
-// M4a2: sleep; M3b: factory and settings reset once preferences live in LittleFS.
+// M4a2: sleep. A reset removes the namespace files and reboots without saving over them.
 class PicoSystem final : public ISystemService {
  public:
   void reboot() override { rebootPending = true; }
   void sleep(uint64_t) override { Serial.println("sleep unavailable"); }
-  void factoryReset() override { Serial.println("persistent config unavailable"); }
-  void resetSettings() override { Serial.println("persistent settings unavailable"); }
+  void factoryReset() override {
+    LittleFS.remove("/NVS/awtrix-cfg.bin");
+    resetSettings();
+  }
+  void resetSettings() override {
+    LittleFS.remove("/NVS/awtrix-ng.bin");
+    resetPending = true;
+    rebootPending = true;
+  }
   bool rebootPending = false;
+  bool resetPending = false;
 };
 
 // The panel is fixed: 53x11, nothing else is admitted.
@@ -52,7 +68,10 @@ sound::AudioRouter g_audio; // Null sinks honestly report MP3/radio unavailable.
 ScreenDisplay g_display;
 PicoSystem g_system;
 UnsetClock g_pageClock;
-bool g_settingsDirty = false; // M3b: saved to LittleFS.
+DeviceConfig g_cfg;
+bool g_storageReady = false;
+bool g_settingsDirty = false;
+SettingsSaver g_settingsSaver{-100000};
 std::unique_ptr<DefaultApps> g_builtinApps;
 std::unique_ptr<ApplicationRuntime> g_runtime;
 std::string g_capabilities; // M4b: served by the HTTP API, M5b: published over MQTT.
@@ -84,8 +103,16 @@ void paceFrame() {
 void setup() {
   Serial.begin(115200);
   // Never wait for a USB host: the panel must boot with power alone.
-  const DeviceConfig cfg = galacticUnicornDefaults(); // M3b: loaded from LittleFS.
-  g_board = &activeBoard(cfg);
+  // Filesystem first: config, settings and palettes all come off it.
+  g_storageReady = fs::begin();
+  if (!g_storageReady) Serial.println("storage: mount failed; persistence unavailable");
+  g_cfg = galacticUnicornDefaults();
+  if (g_storageReady) {
+    g_cfg.load();
+    rp2040::installPaletteLoader();
+  }
+  logbuf::setVerbose(g_cfg.debugMode);
+  g_board = &activeBoard(g_cfg);
   g_audio.setTone(g_board->toneSink());
   g_audio.setTrack(g_board->trackSink());
   // M3b: icons from LittleFS.
@@ -98,6 +125,14 @@ void setup() {
   g_board->begin();
   g_display.setScreen(&g_runtime->canvas());
   g_runtime->markSensors(*g_board);
+  if (g_storageReady) {
+    // bootstrap::restoreUserState without the radio, which these builds leave out.
+    nvs::loadSettings(g_runtime->engine().state().settings());
+    apporder::load(g_runtime->engine());
+    g_runtime->engine().setOrderPersist(apporder::save);
+  }
+  // The runtime applies neither at boot; the ESP32 entry point sets them the same way.
+  g_runtime->engine().state().runtime().tempDecimals = g_cfg.tempDecimals;
   g_runtime->bindOutputs(*g_board, g_settingsDirty);
   g_runtime->engine().state().emit(StateEvent::SettingsChanged);
   g_capabilities = g_runtime->capabilitiesJson(platformDescriptor());
@@ -109,9 +144,20 @@ void setup() {
 void loop() {
   const int64_t now = monotonicMs();
   g_runtime->beginFrame(now);
+  // Collapses a burst of settings changes into one write; every write costs flash erase budget.
+  if (g_settingsDirty && g_storageReady && !g_system.rebootPending && g_settingsSaver.due(now)) {
+    nvs::saveSettings(g_runtime->engine().state().settings());
+    g_settingsDirty = false;
+    g_settingsSaver.saved(now);
+  }
   g_runtime->tick(now); // M6a: the script host.
   g_runtime->render(now);
   g_board->show(g_runtime->canvas());
-  if (g_system.rebootPending && !g_runtime->powerBusy()) rp2040.reboot();
+  if (g_system.rebootPending && !g_runtime->powerBusy()) {
+    // A requested reboot keeps pending settings, unless a reset just removed them.
+    if (g_settingsDirty && g_storageReady && !g_system.resetPending)
+      nvs::saveSettings(g_runtime->engine().state().settings());
+    rp2040.reboot();
+  }
   paceFrame();
 }

@@ -1,0 +1,185 @@
+#include <unity.h>
+
+#include <Preferences.h>
+
+#include "core/Settings.h"
+#include "core/StateStore.h"
+#include "core/api/JsonWriter.h"
+#include "persistence/DeviceConfig.h"
+#include "persistence/Filesystem.h"
+#include "persistence/NvsSettings.h"
+#include "persistence/RadioStore.h"
+#include "platform/rp2040/PicoRestoreSink.h"
+
+// The production DeviceConfig, NvsSettings, LittleFS adapter and restore sink of the Pico, run
+// against the simulated filesystem in compat/.
+using namespace awtrix;
+void setUp() { testFiles.clear(); testDirs.clear(); failWrite = failRename = false; }
+void tearDown() {}
+
+void legacy_matrix_keys_are_removed() {
+  Preferences p;
+  TEST_ASSERT_TRUE(p.begin("awtrix-cfg", false));
+  p.putInt("ph", 16);
+  p.putInt("mwidth", 64);
+  p.end();
+  DeviceConfig cfg;
+  cfg.load();
+  TEST_ASSERT_TRUE(cfg.save());
+  TEST_ASSERT_TRUE(p.begin("awtrix-cfg", true));
+  TEST_ASSERT_FALSE(p.isKey("ph"));
+  TEST_ASSERT_FALSE(p.isKey("mwidth"));
+  p.end();
+}
+
+void config_and_settings_reboot_roundtrip() {
+  TEST_ASSERT_TRUE(fs::begin());
+  TEST_ASSERT_TRUE(testDirs.count("/ICONS") && testDirs.count("/MELODIES") && testDirs.count("/PALETTES"));
+  DeviceConfig before;
+  before.wifiSsid = "test-ssid";
+  before.wifiPass = "test-pass";
+  before.panelHeight = 11;
+  before.mqttPort = 8883;
+  before.tempOffset = -7.5f;
+  before.wifiConnectTimeout = 32100;
+  before.mqttEnabled = true;
+  before.minBrightness = 22;
+  TEST_ASSERT_TRUE(before.save());
+  TEST_ASSERT_FALSE(before.persistencePending);
+  DeviceConfig after;
+  after.load();
+  TEST_ASSERT_EQUAL_STRING("test-ssid", after.wifiSsid.c_str());
+  TEST_ASSERT_EQUAL_STRING("test-pass", after.wifiPass.c_str());
+  TEST_ASSERT_EQUAL(11, after.panelHeight);
+  TEST_ASSERT_EQUAL(8883, after.mqttPort);
+  TEST_ASSERT_EQUAL_FLOAT(-7.5f, after.tempOffset);
+  TEST_ASSERT_EQUAL(32100, after.wifiConnectTimeout);
+  TEST_ASSERT_TRUE(after.mqttEnabled);
+  TEST_ASSERT_EQUAL(22, after.minBrightness);
+  Settings settings;
+  settings.applyRead(api::JsonReader("{\"brightness\":42}"));
+  TEST_ASSERT_EQUAL(42, settings.brightness);
+  nvs::saveSettings(settings);
+  Settings loaded;
+  nvs::loadSettings(loaded);
+  TEST_ASSERT_EQUAL(42, loaded.brightness);
+  std::string a, b;
+  api::JsonWriter wa(a), wb(b);
+  settings.writeMembers(wa);
+  loaded.writeMembers(wb);
+  TEST_ASSERT_EQUAL_STRING(a.c_str(), b.c_str());
+  // A damaged snapshot is not half read: the defaults load instead.
+  testFiles["/NVS/awtrix-cfg.bin"][0] ^= 1;
+  DeviceConfig defaults;
+  defaults.load();
+  TEST_ASSERT_TRUE(defaults.wifiSsid.empty());
+}
+
+void failed_writes_keep_last_config() {
+  DeviceConfig cfg;
+  cfg.wifiSsid = "old";
+  TEST_ASSERT_TRUE(cfg.save());
+  cfg.wifiSsid = "new";
+  failWrite = true;
+  TEST_ASSERT_FALSE(cfg.save());
+  failWrite = false;
+  TEST_ASSERT_TRUE(cfg.persistencePending);
+  DeviceConfig loaded;
+  loaded.load();
+  TEST_ASSERT_EQUAL_STRING("old", loaded.wifiSsid.c_str());
+  failRename = true;
+  TEST_ASSERT_FALSE(cfg.save());
+  failRename = false;
+  loaded.load();
+  TEST_ASSERT_EQUAL_STRING("old", loaded.wifiSsid.c_str());
+  TEST_ASSERT_FALSE(testFiles.count("/NVS/awtrix-cfg.bin.tmp"));
+}
+
+void restore_and_disabled_stores() {
+  DeviceConfig cfg;
+  StateStore state;
+  std::string err;
+  backup::PicoRestoreSink sink(cfg, &state);
+  TEST_ASSERT_TRUE(sink.applyWifi("restored", "test-pass", err));
+  TEST_ASSERT_TRUE(cfg.wifiSsid.empty());
+  sink.commit();
+  DeviceConfig rebooted;
+  rebooted.load();
+  TEST_ASSERT_EQUAL_STRING("restored", rebooted.wifiSsid.c_str());
+  // An aborted asset leaves the old file and no staging file behind.
+  testFiles["/ICONS/test.gif"] = "old";
+  TEST_ASSERT_TRUE(sink.beginFile("/ICONS/test.gif", err));
+  TEST_ASSERT_TRUE(sink.writeFile(reinterpret_cast<const uint8_t*>("new"), 3));
+  sink.abortFile();
+  TEST_ASSERT_EQUAL_STRING("old", testFiles["/ICONS/test.gif"].c_str());
+  TEST_ASSERT_FALSE(testFiles.count("/ICONS/test.gif.restore.tmp"));
+  TEST_ASSERT_TRUE(sink.beginFile("/ICONS/test.gif", err));
+  TEST_ASSERT_TRUE(sink.writeFile(reinterpret_cast<const uint8_t*>("new"), 3));
+  TEST_ASSERT_TRUE(sink.endFile());
+  TEST_ASSERT_EQUAL_STRING("new", testFiles["/ICONS/test.gif"].c_str());
+  // A short write is never published.
+  TEST_ASSERT_TRUE(sink.beginFile("/ICONS/test.gif", err));
+  failWrite = true;
+  TEST_ASSERT_FALSE(sink.writeFile(reinterpret_cast<const uint8_t*>("bad"), 3));
+  failWrite = false;
+  TEST_ASSERT_FALSE(sink.endFile());
+  TEST_ASSERT_EQUAL_STRING("new", testFiles["/ICONS/test.gif"].c_str());
+  TEST_ASSERT_FALSE(sink.beginFile("/NVS/awtrix-cfg.bin", err));
+  TEST_ASSERT_FALSE(sink.beginFile("/ICONS/../bad", err));
+  radiostore::save("[]");
+  TEST_ASSERT_FALSE(radiostore::pending());
+  TEST_ASSERT_FALSE(testFiles.count("/radio.json"));
+}
+
+void restore_creates_nested_asset_directories() {
+  DeviceConfig cfg;
+  StateStore state;
+  std::string err;
+  backup::PicoRestoreSink sink(cfg, &state);
+  TEST_ASSERT_TRUE(sink.beginFile("/ICONS/sub/deeper/smile.gif", err));
+  TEST_ASSERT_TRUE(sink.writeFile(reinterpret_cast<const uint8_t*>("GIF8"), 4));
+  TEST_ASSERT_TRUE(sink.endFile());
+  TEST_ASSERT_EQUAL_STRING("GIF8", testFiles["/ICONS/sub/deeper/smile.gif"].c_str());
+  TEST_ASSERT_TRUE(testDirs.count("/ICONS") && testDirs.count("/ICONS/sub") &&
+                   testDirs.count("/ICONS/sub/deeper"));
+  TEST_ASSERT_FALSE(sink.beginFile("/ICONS/sub/", err));
+  TEST_ASSERT_FALSE(sink.beginFile("/ICONS//x.gif", err));
+  TEST_ASSERT_FALSE(sink.beginFile("/apploop.json", err));
+  TEST_ASSERT_FALSE(sink.beginFile("/ICONSX/x.gif", err));
+}
+
+// R23: a backup made on an ESP32 restores everything but the ESP32's pins and panel.
+void esp32_backup_keeps_the_pico_wiring() {
+  DeviceConfig cfg;
+  const DeviceConfig pico = cfg;
+  StateStore state;
+  std::string err;
+  backup::PicoRestoreSink sink(cfg, &state);
+  constexpr auto system = R"({"pinMatrix":32,"pinBtnLeft":26,"pinBtnSelect":27,"pinBtnRight":14,"pinBattery":34,"pinLdr":35,"pinBuzzer":15,"pinI2cSda":21,"pinI2cScl":22,"pinDfRx":23,"pinDfTx":18,"panelWidth":32,"panels":2,"mqttHost":"esp.broker","mqttEnabled":true})";
+  TEST_ASSERT_TRUE_MESSAGE(sink.applySystem(system, err), err.c_str());
+  sink.commit();
+  DeviceConfig rebooted;
+  rebooted.load();
+  TEST_ASSERT_EQUAL_STRING("esp.broker", rebooted.mqttHost.c_str());
+  TEST_ASSERT_TRUE(rebooted.mqttEnabled);
+  TEST_ASSERT_EQUAL_INT(pico.pinMatrix, rebooted.pinMatrix);
+  TEST_ASSERT_EQUAL_INT(pico.pinBtnLeft, rebooted.pinBtnLeft);
+  TEST_ASSERT_EQUAL_INT(pico.pinLdr, rebooted.pinLdr);
+  TEST_ASSERT_EQUAL_INT(pico.pinBuzzer, rebooted.pinBuzzer);
+  TEST_ASSERT_EQUAL_INT(pico.pinI2cSda, rebooted.pinI2cSda);
+  TEST_ASSERT_EQUAL_INT(pico.panelWidth, rebooted.panelWidth);
+  TEST_ASSERT_EQUAL_INT(pico.panels, rebooted.panels);
+  std::string pinErr;
+  TEST_ASSERT_TRUE(rebooted.validatePins(pinErr));
+}
+
+int main() {
+  UNITY_BEGIN();
+  RUN_TEST(legacy_matrix_keys_are_removed);
+  RUN_TEST(config_and_settings_reboot_roundtrip);
+  RUN_TEST(failed_writes_keep_last_config);
+  RUN_TEST(restore_and_disabled_stores);
+  RUN_TEST(restore_creates_nested_asset_directories);
+  RUN_TEST(esp32_backup_keeps_the_pico_wiring);
+  return UNITY_END();
+}

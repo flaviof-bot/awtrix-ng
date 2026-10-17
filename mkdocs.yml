@@ -13,6 +13,8 @@ docs_dir: docs
 # package.json only marks its directory as ESM for the node-run tests.
 exclude_docs: |
   examples/berry-app-system-prompt.md
+  # Galactic Unicorn only; published with the rp2040 docs variant (M6b).
+  advanced/pico-persistence.md
   assets/flow-converter/package.json
   assets/tc002/package.json
 

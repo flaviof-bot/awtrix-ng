@@ -52,6 +52,27 @@ foreach(TEST_DIR IN LISTS TEST_DIRS)
   endif()
   target_compile_options("${TEST_NAME}" PRIVATE -O2)
   target_compile_definitions("${TEST_NAME}" PRIVATE PIO_UNIT_TESTING UNIT_TEST)
+  # A test with Arduino and LittleFS fakes runs the Pico's own persistence code.
+  if(EXISTS "${TEST_DIR}/compat")
+    target_include_directories("${TEST_NAME}" BEFORE PRIVATE "${TEST_DIR}/compat"
+      "${AWTRIX_ROOT}/src/platform/rp2040/include")
+    target_compile_definitions("${TEST_NAME}" PRIVATE AWTRIX_PLATFORM_RP2040)
+    target_sources("${TEST_NAME}" PRIVATE
+      "${AWTRIX_ROOT}/src/platform/rp2040/LittleFsKv.cpp"
+      "${AWTRIX_ROOT}/src/platform/rp2040/FilesystemRp2040.cpp"
+      "${AWTRIX_ROOT}/src/platform/rp2040/DisabledStores.cpp"
+      "${AWTRIX_ROOT}/src/platform/rp2040/PicoRestoreSink.cpp"
+      "${AWTRIX_ROOT}/src/platform/rp2040/SocProfileRp2040.cpp"
+      "${AWTRIX_ROOT}/src/platform/rp2040/settings/Config.cpp"
+      "${AWTRIX_ROOT}/src/persistence/AppOrderStore.cpp"
+      "${AWTRIX_ROOT}/src/persistence/DeviceConfig.cpp"
+      "${AWTRIX_ROOT}/src/persistence/DeviceConfigJson.cpp"
+      "${AWTRIX_ROOT}/src/persistence/DocumentFile.cpp"
+      "${AWTRIX_ROOT}/src/persistence/FsRestoreSink.cpp"
+      "${AWTRIX_ROOT}/src/persistence/IconOriginsStore.cpp"
+      "${AWTRIX_ROOT}/src/persistence/NvsSettings.cpp"
+      "${AWTRIX_ROOT}/src/persistence/SystemConfigApply.cpp")
+  endif()
   target_link_libraries("${TEST_NAME}" PRIVATE awtrix_core unity)
   if(TEST_NAME STREQUAL "test_scripthost" OR TEST_NAME STREQUAL "test_scriptevents")
     target_link_libraries("${TEST_NAME}" PRIVATE awtrix_script_extensions)
