@@ -2,11 +2,8 @@
 
 #include <Preferences.h>
 
-#include "core/Settings.h"
-#include "core/StateStore.h"
 #include "persistence/DeviceConfig.h"
 #include "persistence/Filesystem.h"
-#include "persistence/NvsSettings.h"
 #include "persistence/RadioStore.h"
 #include "platform/rp2040/PicoRestoreSink.h"
 
@@ -78,19 +75,8 @@ void config_and_settings_reboot_roundtrip() {
   TEST_ASSERT_EQUAL(32100, after.wifiConnectTimeout);
   TEST_ASSERT_TRUE(after.mqttEnabled);
   TEST_ASSERT_EQUAL(22, after.minBrightness);
-  Settings settings;
-  settings.applyRead(api::JsonReader("{\"brightness\":42}"));
-  TEST_ASSERT_EQUAL(42, settings.brightness);
-  nvs::saveSettings(settings);
-  Settings loaded;
-  nvs::loadSettings(loaded);
-  TEST_ASSERT_EQUAL(42, loaded.brightness);
-  // The Settings this host test links are the Linux build's, whose platform keys (bootSound)
-  // the Pico never stores, so compare what the Pico does store rather than every member.
-  TEST_ASSERT_TRUE(testFiles.count("/NVS/awtrix-ng.bin"));
-  TEST_ASSERT_EQUAL(settings.volume, loaded.volume);
-  TEST_ASSERT_EQUAL(settings.autoBrightness, loaded.autoBrightness);
-  TEST_ASSERT_EQUAL(settings.transitionEffect, loaded.transitionEffect);
+  // Settings are not round-tripped here: this target links the Linux build of the core, whose
+  // Settings layout differs from the Pico's, so nvs::saveSettings would mix the two.
   // A damaged snapshot is not half read: the defaults load instead.
   testFiles["/NVS/awtrix-cfg.bin"][0] ^= 1;
   DeviceConfig defaults;
@@ -120,9 +106,8 @@ void failed_writes_keep_last_config() {
 
 void restore_and_disabled_stores() {
   DeviceConfig cfg;
-  StateStore state;
   std::string err;
-  backup::PicoRestoreSink sink(cfg, &state);
+  backup::PicoRestoreSink sink(cfg, nullptr);
   TEST_ASSERT_TRUE(sink.applyWifi("restored", "test-pass", err));
   TEST_ASSERT_TRUE(cfg.wifiSsid.empty());
   sink.commit();
@@ -156,9 +141,8 @@ void restore_and_disabled_stores() {
 
 void restore_creates_nested_asset_directories() {
   DeviceConfig cfg;
-  StateStore state;
   std::string err;
-  backup::PicoRestoreSink sink(cfg, &state);
+  backup::PicoRestoreSink sink(cfg, nullptr);
   TEST_ASSERT_TRUE(sink.beginFile("/ICONS/sub/deeper/smile.gif", err));
   TEST_ASSERT_TRUE(sink.writeFile(reinterpret_cast<const uint8_t*>("GIF8"), 4));
   TEST_ASSERT_TRUE(sink.endFile());
@@ -175,9 +159,8 @@ void restore_creates_nested_asset_directories() {
 void esp32_backup_keeps_the_pico_wiring() {
   DeviceConfig cfg;
   const DeviceConfig pico = cfg;
-  StateStore state;
   std::string err;
-  backup::PicoRestoreSink sink(cfg, &state);
+  backup::PicoRestoreSink sink(cfg, nullptr);
   constexpr auto system = R"({"pinMatrix":32,"pinBtnLeft":26,"pinBtnSelect":27,"pinBtnRight":14,"pinBattery":34,"pinLdr":35,"pinBuzzer":15,"pinI2cSda":21,"pinI2cScl":22,"pinDfRx":23,"pinDfTx":18,"panelWidth":32,"panels":2,"mqttHost":"esp.broker","mqttEnabled":true})";
   TEST_ASSERT_TRUE_MESSAGE(sink.applySystem(system, err), err.c_str());
   sink.commit();
