@@ -90,7 +90,7 @@ void config_and_settings_reboot_roundtrip() {
   TEST_ASSERT_TRUE(testFiles.count("/NVS/awtrix-ng.bin"));
   TEST_ASSERT_EQUAL(settings.volume, loaded.volume);
   TEST_ASSERT_EQUAL(settings.autoBrightness, loaded.autoBrightness);
-  TEST_ASSERT_EQUAL_STRING(settings.transitionEffect.c_str(), loaded.transitionEffect.c_str());
+  TEST_ASSERT_EQUAL(settings.transitionEffect, loaded.transitionEffect);
   // A damaged snapshot is not half read: the defaults load instead.
   testFiles["/NVS/awtrix-cfg.bin"][0] ^= 1;
   DeviceConfig defaults;
