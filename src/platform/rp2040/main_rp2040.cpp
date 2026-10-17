@@ -14,6 +14,7 @@
 #include "hal/GalacticUnicornBoard.h"
 #include "hal/IBoard.h"
 #include "media/AwtrixFontAdapter.h"
+#include "media/DevicePageIcon.h"
 #include "persistence/AppOrderStore.h"
 #include "persistence/Filesystem.h"
 #include "persistence/NvsSettings.h"
@@ -119,9 +120,10 @@ void setup() {
   g_board = &activeBoard(g_cfg);
   g_audio.setTone(g_board->toneSink());
   g_audio.setTrack(g_board->trackSink());
-  // M3b: icons from LittleFS.
+  // Two independent decoders, as on ESP32, permit page transitions with icons.
+  static DevicePageIcon pageIcon, pageIconB;
   ApplicationServices services{g_audio, g_display, g_system, g_pageClock, awtrixFontCatalog(),
-      nullptr, nullptr, [](uint8_t brightness) { g_board->setBrightness(brightness); }};
+      &pageIcon, &pageIconB, [](uint8_t brightness) { g_board->setBrightness(brightness); }};
   g_builtinApps.reset(new DefaultApps);
   g_runtime.reset(new ApplicationRuntime(g_board->matrixWidth(), g_board->matrixHeight(), services,
                                           g_builtinApps->registry()));
@@ -140,7 +142,7 @@ void setup() {
   g_runtime->bindOutputs(*g_board, g_settingsDirty);
   g_runtime->engine().state().emit(StateEvent::SettingsChanged);
   g_capabilities = g_runtime->capabilitiesJson(platformDescriptor());
-  Serial.printf("boot: AWTRIX NG %s on %s (%dx%d); no network/panel driver yet\n",
+  Serial.printf("boot: AWTRIX NG %s on %s (%dx%d); network pending\n",
                 AWTRIX_NG_VERSION, g_board->name(), g_board->matrixWidth(),
                 g_board->matrixHeight());
 }

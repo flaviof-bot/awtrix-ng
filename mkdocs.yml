@@ -15,6 +15,7 @@ exclude_docs: |
   examples/berry-app-system-prompt.md
   # Galactic Unicorn only; published with the rp2040 docs variant (M6b).
   advanced/pico-persistence.md
+  advanced/galactic-unicorn-display.md
   assets/flow-converter/package.json
   assets/tc002/package.json
 
