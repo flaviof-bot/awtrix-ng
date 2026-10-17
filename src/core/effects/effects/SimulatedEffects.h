@@ -138,8 +138,8 @@ struct Breakout {
 
     bx = static_cast<int16_t>(nx);
     by = static_cast<int16_t>(ny);
-    // Refills the wall after 24 * (w + h) moves without a brick.
-    if (++idle > 24 * (w + h)) refill();
+    // Refills the wall after 24 * (w + h) moves without a brick, once the ball is below it.
+    if (++idle > 24 * (w + h) && by >= top + rows) refill();
   }
 };
 

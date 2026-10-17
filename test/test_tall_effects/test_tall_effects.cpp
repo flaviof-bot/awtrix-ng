@@ -3,6 +3,7 @@
 // height from 8 to 16 instead of PR 1's replayed games.
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <set>
 #include <vector>
@@ -127,7 +128,10 @@ static void test_brick_play() {
       const int after = bricksLeft(g);
       TEST_ASSERT_TRUE(after == before || after == before - 1 || after == full);
       int col, row;
-      if (!(after == full && before != full)) TEST_ASSERT_FALSE(g.brick(g.bx, g.by, col, row));
+      char where[96];
+      snprintf(where, sizeof where, "%dx%d step %d: ball %d,%d dx %d dy %d, bricks %d -> %d", w, h, s,
+               g.bx, g.by, g.dx, g.dy, before, after);
+      TEST_ASSERT_FALSE_MESSAGE(g.brick(g.bx, g.by, col, row), where);
       speeds.insert(std::abs(g.dx));
       rows[g.by] = true;
       least = std::min(least, after);
