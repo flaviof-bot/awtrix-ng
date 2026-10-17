@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/Blueforcer/awtrix-ng/actions/workflows/ci.yml/badge.svg)](https://github.com/Blueforcer/awtrix-ng/actions/workflows/ci.yml)
 [![Docs](https://github.com/Blueforcer/awtrix-ng/actions/workflows/docs.yml/badge.svg)](https://github.com/Blueforcer/awtrix-ng/actions/workflows/docs.yml)
-![Platform](https://img.shields.io/badge/platform-ESP32%20%7C%20ESP32--S3%20%7C%20TC002-blue)
+![Platform](https://img.shields.io/badge/platform-ESP32%20%7C%20ESP32--S3%20%7C%20TC002%20%7C%20RP2040%20%7C%20RP2350-blue)
 [![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-lightgrey)](LICENSE.md)
 
 **[Documentation](https://blueforcer.github.io/awtrix-ng/)** · **[AWTRIX Hub](https://awtrix.de)** ·
@@ -28,6 +28,11 @@ It is the successor to AWTRIX 3, rewritten from scratch. It runs on the **Ulanzi
 **Ulanzi TC002** and clocks you build yourself with an **ESP32** or **ESP32-S3**. Every clock runs
 the same engine, with the same API, the same MQTT topics and the same scripts, so an automation
 written for one clock works on the others.
+
+It also runs on Pimoroni's [Galactic Unicorn](docs/advanced/galactic-unicorn.md), a fixed 53×11
+display, with a Pico W (RP2040) or a Pico 2 W (RP2350). Its images install over USB as UF2 files,
+and its optional features follow the board's capabilities. Hardware results so far come from the
+1.2.1-based port (PR 1); see the guide.
 
 ## Which clock does what
 
@@ -173,8 +178,8 @@ pio run -e awtrix            # build the ESP32 firmware
 pio run -e awtrix -t upload  # build and flash over USB
 ```
 
-The [developer guide](docs/developers/building.md) covers the ESP32-S3 builds, the TC002 and the
-tests.
+The [developer guide](docs/developers/building.md) covers the ESP32-S3 builds, the TC002, the
+Galactic Unicorn and the tests.
 
 ## Contributing
 
