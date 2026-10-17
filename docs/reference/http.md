@@ -188,6 +188,7 @@ Routes that change something answer when the change is done:
 | Busy | 503 | `serviceBusy`, message `busy, try again` (with `Retry-After: 2`) |
 | Failed / unknown | 500 | `internalError`, message `command failed` |
 
+<!-- only esp32 esp32-s3 -->
 A firmware build can leave out optional features: scripting, MP3 files, radio, HTTPS streams and
 browser firmware updates. Every ESP32 build has them all. Where a build leaves one out, a route or
 MQTT command that exists only for that feature (`/api/v1/scripts/...`, `/api/v1/apps/script/...`,
@@ -197,6 +198,7 @@ body is read. `/api/v1/audio/play` and `cmd/audio/play` are shared: a sound that
 feature (a file, a station, an `https://` address) answers `503 unavailable` once the body is
 parsed, before anything plays, while the other sounds keep working.
 [`scripting`](#get-apiv1capabilities) in capabilities and the `audio` flags say what this build has.
+<!-- /only -->
 
 The one exception is `PATCH /api/v1/settings`: on success it returns **all settings** instead of
 `{"ok":true}`.
