@@ -41,15 +41,18 @@ ordering. A 14-bit LUT preserves panel precision instead of first quantizing
 to an 8-bit intermediate canvas. Gamma is applied **once**, using the NG gamma
 setting (default 1.9), replacing Pimoroni's fixed 2.2 curve. Brightness and color
 balance scale linear light **after** gamma, unlike the upstream brightness
-pre-scale. There is no second fixed gamma curve. Brightness is manual for
-now; automatic brightness needs the light sensor, which is not wired yet.
+pre-scale. There is no second fixed gamma curve. The ADC2 light sensor feeds
+NG's median filter, light curve and automatic brightness policy.
 
 ## Input pins
 
-These constants are declared in `hal/GalacticUnicornDisplay.h` but inputs are
-not implemented by this display-only phase:
+All nine keys are active low and debounced for 35 ms. B held for 500 ms opens
+the shared launcher; A/C step in it. Rotation and swapButtons follow ButtonRouter.
+D remains unmapped. Sleep, brightness and volume use the engine command path.
+Volume changes buzzerVolume, the tone setting used by AudioRouter; speaker wiring
+comes in M5b. The webhook and A+C boot rescue are separate milestones.
 
-| Input | GPIO | Planned function |
+| Input | GPIO | Function |
 |---|---|---|
 | A / B / C | 0 / 1 / 3 | Left / select / right |
 | D | 6 | Unmapped |

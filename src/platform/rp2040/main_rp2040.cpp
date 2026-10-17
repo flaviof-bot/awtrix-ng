@@ -22,6 +22,7 @@
 #include "platform/rp2040/PaletteFiles.h"
 #include "platform/rp2040/Rp2040Profile.h"
 #include "system/Log.h"
+#include "system/GalacticUnicornControls.h"
 
 #include <LittleFS.h>
 #include "system/MonotonicClock.h"
@@ -65,6 +66,7 @@ class PicoSystem final : public ISystemService {
 constexpr DisplayLimits kUnicornDisplayLimits{53, 53, 8, 11, 53 * 11};
 
 IBoard* g_board = nullptr;
+GalacticUnicornControls g_controls;
 sound::AudioRouter g_audio; // Null sinks honestly report MP3/radio unavailable.
 ScreenDisplay g_display;
 PicoSystem g_system;
@@ -124,6 +126,7 @@ void setup() {
   static DevicePageIcon pageIcon, pageIconB;
   ApplicationServices services{g_audio, g_display, g_system, g_pageClock, awtrixFontCatalog(),
       &pageIcon, &pageIconB, [](uint8_t brightness) { g_board->setBrightness(brightness); }};
+  services.lightConfig = [] { return g_cfg.lightConfig(); };
   g_builtinApps.reset(new DefaultApps);
   g_runtime.reset(new ApplicationRuntime(g_board->matrixWidth(), g_board->matrixHeight(), services,
                                           g_builtinApps->registry()));
@@ -131,6 +134,7 @@ void setup() {
   g_board->begin();
   g_display.setScreen(&g_runtime->canvas());
   g_runtime->markSensors(*g_board);
+  g_controls.begin(g_runtime->engine(), g_cfg, &g_runtime->launcher());
   if (g_storageReady) {
     // bootstrap::restoreUserState without the radio, which these builds leave out.
     nvs::loadSettings(g_runtime->engine().state().settings());
@@ -149,6 +153,9 @@ void setup() {
 
 void loop() {
   const int64_t now = monotonicMs();
+  auto& unicorn = static_cast<GalacticUnicornBoard&>(*g_board);
+  g_controls.tick(g_runtime->engine(), unicorn.readInputs(), now);
+  g_controls.sampleLight(g_runtime->engine(), unicorn.readLdrRaw(), now);
   g_runtime->beginFrame(now);
   // Collapses a burst of settings changes into one write; every write costs flash erase budget.
   if (g_settingsDirty && g_storageReady && !g_system.rebootPending && g_settingsSaver.due(now)) {
