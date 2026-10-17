@@ -1,5 +1,6 @@
 #include "core/apps/SpecRenderer.h"
 
+#include "core/render/ContentBand.h"
 #include "core/render/DrawProgram.h"
 #include "core/render/Gfx2d.h"
 #include "core/render/ScrollText.h"
