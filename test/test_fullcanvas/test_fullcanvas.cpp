@@ -103,13 +103,13 @@ static void test_spec_background_and_absolute_draw() {
   for (std::size_t i = 0; i < p.c.size(); ++i)
     TEST_ASSERT_EQUAL_HEX32(0x123456u, p.c.data()[i]);
   p.everyRow();
-  DrawOp op;
-  op.kind = DrawKind::Pixel;
-  op.color = 0xFF0000u;
-  for (int y : {0, 10}) {
-    op.y = y;
-    s.extrasMut().draw.push_back(op);
+  render::DrawCommand ops[2];
+  for (int i = 0; i < 2; ++i) {
+    ops[i].kind = DrawKind::Pixel;
+    ops[i].color = 0xFF0000u;
+    ops[i].y = i ? 10 : 0;
   }
+  TEST_ASSERT_TRUE(s.extrasMut().draw.commands.assign(ops, ops + 2));
   renderSpec(p.c, s, font, SpecRender{});
   TEST_ASSERT_EQUAL_HEX32(0xFF0000u, p.c.getPixel(0, 0));
   TEST_ASSERT_EQUAL_HEX32(0xFF0000u, p.c.getPixel(0, 10));
