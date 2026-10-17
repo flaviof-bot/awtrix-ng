@@ -16,8 +16,9 @@ class IHostResolver {
  public:
   virtual ~IHostResolver() = default;
 
-  // Never blocks. Call it repeatedly with the same host until it returns Ready or Failed; a
-  // literal IPv4 address is answered on the spot.
+  // Call it repeatedly with the same host until it returns Ready or Failed; a literal IPv4 address
+  // is answered on the spot. ESP32 and Linux never block. The Pico answers at once with bounded
+  // calls instead: up to 1 s per lookup, 2 s with the bare-label .local fallback.
   virtual ResolveState resolve(const std::string& host) = 0;
 
   // IPv4 in host byte order, matching net::Endpoint (127.0.0.1 is 0x7f000001).

@@ -455,6 +455,31 @@ void test_knob_turn_event_names_both_directions() {
   TEST_ASSERT_TRUE(tpl.find("value_json.turn") != std::string::npos);
 }
 
+// The Galactic Unicorn announces the stock device: Home Assistant blueprints match on these.
+void test_unicorn_keeps_blueprint_identity_and_stock_button_names() {
+  DiscoveryContext ctx = baseContext();
+  ctx.hasLightSensor = true; // Unicorn has no battery or environment sensor.
+  const std::string json = emitToString(ctx);
+  const JsonReader doc = parsed(json);
+  TEST_ASSERT_EQUAL_STRING("Blueforcer", str(at(doc, "dev"), "mf").c_str());
+  TEST_ASSERT_EQUAL_STRING("AWTRIX NG", str(at(doc, "dev"), "mdl").c_str());
+  const JsonReader cmps = at(doc, "cmps");
+  TEST_ASSERT_EQUAL_size_t(21, memberCount(cmps));
+  TEST_ASSERT_EQUAL_STRING("MQTT prefix", str(at(cmps, "prefix"), "name").c_str());
+  TEST_ASSERT_EQUAL_STRING("~/state/prefix", str(at(cmps, "prefix"), "stat_t").c_str());
+  const char* keys[] = {"btnl", "btnm", "btnr"};
+  const char* names[] = {"Button left", "Button select", "Button right"};
+  const char* topics[] = {"~/state/buttons/left", "~/state/buttons/select", "~/state/buttons/right"};
+  for (int i = 0; i < 3; ++i) {
+    const JsonReader button = at(cmps, keys[i]);
+    TEST_ASSERT_EQUAL_STRING("binary_sensor", str(button, "p").c_str());
+    TEST_ASSERT_EQUAL_STRING(names[i], str(button, "name").c_str());
+    TEST_ASSERT_EQUAL_STRING(topics[i], str(button, "stat_t").c_str());
+    TEST_ASSERT_EQUAL_STRING("1", str(button, "pl_on").c_str());
+    TEST_ASSERT_EQUAL_STRING("0", str(button, "pl_off").c_str());
+  }
+}
+
 }
 
 void setUp() {}
@@ -481,6 +506,7 @@ int main(int, char**) {
   RUN_TEST(test_volume_entities_follow_the_sound_outputs);
   RUN_TEST(test_volume_entities_use_the_settings_keys);
   RUN_TEST(test_platform_entities_follow_the_shared_ones);
+  RUN_TEST(test_unicorn_keeps_blueprint_identity_and_stock_button_names);
   UNITY_END();
   return 0;
 }

@@ -209,6 +209,21 @@ wakes it. Wake restarts the application like ESP32 deep-sleep wake, but reports
 separate and does not enter this timed sleep. Check timer wake and a
 release/new GPIO27 press on physical hardware.
 
+## MQTT and Home Assistant
+
+Both Pico builds link the ESP32's MQTT service, so the
+[settings, topics, retain flags and Home Assistant discovery](../reference/mqtt.md) are the
+same. Restart after changing broker settings, as on an ESP32. Discovery keeps manufacturer
+`Blueforcer`, model `AWTRIX NG` and the stock entity names, including the MQTT prefix and the
+left/select/right button binary sensors; the device is named `AWTRIX NG` unless a hostname is
+set. The Unicorn adds the light sensor entities, and no battery or environment sensor.
+
+The Pico's network stack resolves DNS and `.local` mDNS names only with blocking calls. Each
+lookup may pause the loop for up to one second; if a `.local` lookup fails, DNS on the bare label
+is tried too, for at most two seconds together. An ESP32 resolves in a background task instead.
+TCP connect and write use a 300 ms timeout, the MQTT CONNACK wait is two seconds, and this bounded
+work feeds the eight-second hardware watchdog. Failed connections keep the shared retry backoff.
+
 ## UDP services
 
 Both Pico builds include shared discovery (query `FIND_AWTRIXNG` on UDP 4210,

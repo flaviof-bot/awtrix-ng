@@ -38,7 +38,11 @@
 #include "platform/rp2040/TimeService.h"
 #include "system/Log.h"
 #include "system/Watchdog.h"
+#include "system/ApplicationBootstrap.h"
 #include "system/GalacticUnicornControls.h"
+#include "core/net/DeviceUrl.h"
+#include "transport/DeviceStateJson.h"
+#include "transport/mqtt/MqttService.h"
 #include "transport/net/ArtnetService.h"
 #include "transport/net/DiscoveryService.h"
 #include "transport/http/HttpApiServer.h"
@@ -147,7 +151,8 @@ std::unique_ptr<DefaultApps> g_builtinApps;
 std::unique_ptr<ApplicationRuntime> g_runtime;
 NetworkService g_net;
 HttpApiServer g_http;
-std::string g_capabilities; // Served by the HTTP API; M5b: published over MQTT.
+MqttService g_mqtt;
+std::unique_ptr<net::IHostResolver> g_hostResolver;
 
 // Holding B (select) for one second at boot forces the provisioning AP without erasing the stored
 // credentials, as on the ESP32. The runtime hold of B (the launcher) only starts in loop().
@@ -184,9 +189,10 @@ PlatformDescriptor platformDescriptor() {
 // As on the ESP32: at boot and after every settings change.
 void refreshCapabilities() {
   const PlatformDescriptor platform = platformDescriptor();
-  g_capabilities = g_runtime->capabilitiesJson(platform);
-  g_http.setCapabilitiesJson(std::make_shared<const std::string>(g_capabilities));
+  auto caps = std::make_shared<const std::string>(g_runtime->capabilitiesJson(platform));
+  g_http.setCapabilitiesJson(caps);
   g_http.setDeviceCapabilities(DeviceCapabilities::from(g_audio.caps(), &platform));
+  g_mqtt.setCapabilitiesJson(std::move(caps));
 }
 
 void paceFrame() {
@@ -276,6 +282,7 @@ void setup() {
   // In AP mode the server admits only the provisioning routes (core/ProvisioningPolicy.h).
   g_http.begin(webPort, g_runtime->engine(), *g_board, g_runtime->canvas(), mac.c_str(), g_cfg,
                g_net.apMode());
+  g_http.setOnError([](const std::string& event) { g_mqtt.publishError(event); });
   g_http.setOnConfigChanged([] {
     // The panel size is fixed, so only mirror and rotate reach the board, and they apply live.
     const MatrixLayout layout = g_cfg.matrixLayout();
@@ -284,12 +291,23 @@ void setup() {
     refreshCapabilities();
     g_runtime->engine().state().runtime().tempDecimals = g_cfg.tempDecimals;
     logbuf::setVerbose(g_cfg.debugMode);
+    g_mqtt.applyHaConfig(g_cfg);
   });
   g_http.setOnAssetsChanged([] {
     g_runtime->invalidateIcons();
     render::clearPaletteCache();
   });
+  // Before the MQTT service starts: its Home Assistant discovery is built from these.
   refreshCapabilities();
+  // The ESP32's MQTT service, topics and discovery; the Pico's resolver bounds each lookup.
+  g_hostResolver = net::makeHostResolver();
+  const std::string uid = g_uid;
+  bootstrap::beginMqtt(g_mqtt, g_runtime->engine(), *g_board, g_cfg, uid, *g_hostResolver);
+  g_mqtt.setDeviceState([uid](bool scripting) {
+    return buildDeviceStateJson(g_runtime->engine(), *g_board, uid, scripting);
+  });
+  g_mqtt.setWebUrl([webPort] { return net::deviceUrl(g_net.ip(), webPort); });
+  bootstrap::bindDisplay(g_display, g_runtime->canvas(), g_mqtt);
 #if AWTRIX_PICO_UDP
   if (g_netWasConnected) {
     g_disco.begin(g_net.hostname(), g_cfg.webPort);
@@ -308,6 +326,7 @@ void loop() {
   g_runtime->beginFrame(now);
   g_net.tick(static_cast<uint32_t>(now));
   g_http.tick();
+  g_mqtt.tick();
   const bool netConnected = g_net.isConnected();
   // A changed tz or ntpServer restarts SNTP; so does the link coming back, as on the ESP32.
   g_time.apply(g_cfg.tz, g_cfg.ntpServer, netConnected && !g_netWasConnected);
