@@ -220,8 +220,8 @@ Reads the device state and statistics.
 | `version` | string | - | firmware version, for example `1.0.12` |
 | `uid` | string | - | unique device id |
 | `boardType` | string | - | <!-- only esp32 esp32-s3 -->`awtrixng`<!-- /only --><!-- only tc002 -->`tc002`<!-- /only -->. See [Device state](device.md) |
-| `soc` | string | - | <!-- only esp32 -->`esp32`<!-- /only --><!-- only esp32-s3 -->`esp32s3`<!-- /only --><!-- only tc002 -->the processor type, for example `armv7l`<!-- /only --> |
-| `updateImage` | string | - | the update file `POST /update` accepts on this device: <!-- only esp32 -->`firmware-awtrix-ng.bin`<!-- /only --><!-- only esp32-s3 -->`firmware-awtrix-ng-s3-octal.bin` or `firmware-awtrix-ng-s3-quad.bin`<!-- /only --><!-- only tc002 -->`awtrix-ng-tc002.awup`<!-- /only --> |
+| `soc` | string | - | <!-- only esp32 -->`esp32`<!-- /only --><!-- only esp32-s3 -->`esp32s3`<!-- /only --><!-- only tc002 -->the processor type, for example `armv7l`<!-- /only --><!-- only rp2040 -->`rp2040`, on the Pico W and the Pico 2 W alike<!-- /only --> |
+| `updateImage` | string | - | the update file `POST /update` accepts on this device: <!-- only esp32 -->`firmware-awtrix-ng.bin`<!-- /only --><!-- only esp32-s3 -->`firmware-awtrix-ng-s3-octal.bin` or `firmware-awtrix-ng-s3-quad.bin`<!-- /only --><!-- only tc002 -->`awtrix-ng-tc002.awup`<!-- /only --><!-- only rp2040 -->`firmware-galactic-unicorn.uf2` or `firmware-galactic-unicorn-2w.uf2`; on this board `POST /update` takes no file, and the UF2 is installed over USB<!-- /only --> |
 | `ipAddress` | string | - | current IP address in your network |
 | `macAddress` | string | - | the clock's Wi-Fi MAC address, for example `A4:CF:12:0B:3C:7D`. Networks that only admit known devices need it |
 | `hostname` | string | - | the name AWTRIX answers to, also over mDNS. Made from the device id when not set in `/api/v1/system`. See [Device state](device.md) |
@@ -2621,6 +2621,17 @@ flag is always present:
 
 `track` is always `false` on this clock.
 <!-- /only -->
+<!-- only rp2040 -->
+```json
+"audio":{"mp3":false,"rtttl":true,"song":false,"speech":false,"track":false,"radio":false,"url":false,"effect":false,"clip":false}
+```
+
+| Flag | `true` when |
+|---|---|
+| `rtttl` | melodies play on the board's speaker: its I²S tone output has started |
+
+`mp3`, `song`, `speech`, `track`, `radio`, `url`, `effect` and `clip` are always `false` on this board: it has no MP3, radio or DFPlayer.
+<!-- /only -->
 
 The web UI shows each Audio section only when its flag is `true`.<!-- only esp32 esp32-s3 --> It hides the Audio tab when
 `rtttl`, `track`, `mp3` and `radio` are all `false`.<!-- /only -->
@@ -2694,6 +2705,28 @@ Read the rules here instead of keeping your own table.
 | `rtc` | the only pins that can wake the device from [`POST /api/v1/device/sleep`](#post-apiv1devicesleep) with `pinBtnSelect`. Other pins are accepted but cannot wake AWTRIX |
 | `matrix` | the only values `pinMatrix` accepts |
 | `defaults` | the pins a new device with this chip starts with, and falls back to if the stored pins are invalid |
+<!-- /only -->
+<!-- only rp2040 -->
+
+#### `gpio`: the board's fixed pins
+
+Every pin of the Galactic Unicorn is part of the board. `gpio` lists them so that the web UI can
+show them; a pin map other than `defaults` is refused with `400 invalidPinConfig`.
+
+```json
+"gpio":{"soc":"rp2040","label":"Galactic Unicorn (Pico W / Pico 2 W)","fixed":true,
+        "rtc":[],"matrix":[],"panel":{"width":53,"heights":[8,11]},
+        "defaults":{"pinMatrix":-1, ...}}
+```
+
+| Key | Meaning |
+|---|---|
+| `soc`, `label` | chip id and display name. `soc` is the same as in the device state, for the Pico W and the Pico 2 W alike |
+| `fixed` | `true`: the wiring is part of the board, and pin changes are refused |
+| `rtc` | empty: the **Sleep** key (GPIO27) ends a [timed sleep](#post-apiv1devicesleep), not a select pin |
+| `matrix` | empty: the display has no data pin to choose, so `pinMatrix` is `-1`. This does not mean the display is off |
+| `panel` | the built-in display: its `width` and the `heights` it can run at. `panelWidth` must be `width`, `panels` must be `1` and `panelHeight` one of `heights` |
+| `defaults` | the board's pin map. See [Fixed wiring](../advanced/galactic-unicorn.md#fixed-wiring) for every pin |
 <!-- /only -->
 
 **Errors:**
@@ -3427,6 +3460,11 @@ Installs a new firmware. The web UI uses this route too.
 
 **Request:** a `multipart/form-data` upload of one firmware file.
 
+<!-- only rp2040 -->
+On the Galactic Unicorn this route answers `503 unavailable`: the board takes firmware only as a
+UF2 over USB (BOOTSEL). See [Galactic Unicorn → Flash over USB](../advanced/galactic-unicorn.md#flash-over-usb).
+
+<!-- /only -->
 <!-- only esp32 esp32-s3 -->
 The file is the firmware `.bin` file. It is checked first. The running firmware is replaced only
 after the whole file has arrived and passed the check, so a refused or interrupted upload leaves

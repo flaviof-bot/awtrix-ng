@@ -62,6 +62,12 @@ The change applies at once.
   and the display always uses `brightness`.
 <!-- /only -->
 
+<!-- only rp2040 -->
+The Galactic Unicorn's light sensor is part of the board, on GPIO 28; there is nothing to set up.
+See [Fixed wiring](../advanced/galactic-unicorn.md#fixed-wiring).
+
+<!-- /only -->
+
 <!-- only esp32 esp32-s3 -->
 ## What auto-brightness does
 

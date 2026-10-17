@@ -270,7 +270,7 @@ These keys are in every response.
 | --- | --- | --- | --- | --- |
 | `version` | string | - | - | Firmware version. Same value as `GET /api/v1/version`. |
 | `uid` | string | 12 lowercase hex chars | - | Device ID: the Wi-Fi MAC address in lowercase without colons. It never changes, not even after a new firmware install. Also the default MQTT topic prefix and MQTT client ID. |
-<!-- only esp32 esp32-s3 -->
+<!-- only esp32 esp32-s3 rp2040 -->
 | `boardType` | string | `awtrixng` | - | Which firmware this is. `awtrixng` on every board, whatever your pin map. |
 <!-- /only -->
 <!-- only tc002 -->
@@ -285,6 +285,9 @@ These keys are in every response.
 <!-- only tc002 -->
 | `soc` | string | `armv7l` | - | The processor the firmware is made for. |
 <!-- /only -->
+<!-- only rp2040 -->
+| `soc` | string | `rp2040` | - | The chip family the firmware is made for: the Pico W and the Pico 2 W both report `rp2040`. Tell the two images apart with `updateImage`; for pin rules read `gpio` in `GET /api/v1/capabilities`. |
+<!-- /only -->
 <!-- only esp32 -->
 | `updateImage` | string | `firmware-awtrix-ng.bin` | - | The update file this device needs – the one `POST /update` accepts. The web UI uses it to offer the right download. |
 <!-- /only -->
@@ -294,21 +297,30 @@ These keys are in every response.
 <!-- only tc002 -->
 | `updateImage` | string | `awtrix-ng-tc002.awup` | - | The update file this device needs – the one `POST /update` accepts. The web UI uses it to offer the right download. |
 <!-- /only -->
+<!-- only rp2040 -->
+| `updateImage` | string | `firmware-galactic-unicorn.uf2`, `firmware-galactic-unicorn-2w.uf2` | - | The firmware file this device needs: the first for a Pico W, the second for a Pico 2 W. It is installed over USB ([BOOTSEL](../advanced/galactic-unicorn.md#flash-over-usb)); `POST /update` does not take it. The web UI uses it to name the right file. |
+<!-- /only -->
 | `ipAddress` | string | dotted quad | - | The IP address in your home network. In setup mode this is not the address you used to reach AWTRIX. |
 | `macAddress` | string | `A4:CF:12:0B:3C:7D` | - | The Wi-Fi MAC address the clock joins your network with, in upper case with colons. Networks that only admit known devices need it. The web UI shows it on the dashboard and in setup mode. |
 | `hostname` | string | 1 … 32 chars | - | The name AWTRIX uses on the network and announces over mDNS (lets you open `http://<hostname>.local`). If you never set a name, it is `awtrixng-` plus the last six characters of `uid`. In that case `hostname` in `GET /api/v1/system` is empty, because it holds only a name you set yourself. |
 | `wifiRssi` | integer | about −30 (excellent) to −90 (unusable) | dBm | Wi-Fi signal strength. |
-| `uptimeSeconds` | integer | 0 … | seconds | Seconds since the last start. <!-- only esp32 esp32-s3 -->Starts at 0 after every restart, including after an update or a settings reset.<!-- /only --><!-- only tc002 -->It counts from the moment the clock was switched on, so a restart of AWTRIX alone keeps counting.<!-- /only --> |
+| `uptimeSeconds` | integer | 0 … | seconds | Seconds since the last start. <!-- only esp32 esp32-s3 rp2040 -->Starts at 0 after every restart, including after an update or a settings reset.<!-- /only --><!-- only tc002 -->It counts from the moment the clock was switched on, so a restart of AWTRIX alone keeps counting.<!-- /only --> |
 <!-- only esp32 esp32-s3 -->
 | `resetReason` | string | `poweron`, `external`, `software`, `panic`, `interruptWatchdog`, `taskWatchdog`, `watchdog`, `deepSleep`, `brownout`, `sdio`, `unknown` | - | Why AWTRIX last started. `poweron`: switched on. `software`: AWTRIX restarted itself (update, restart from the web UI). `panic` or one of the `watchdog` values: AWTRIX crashed or hung and was restarted. `brownout`: the power supply voltage dropped too low. `deepSleep`: woke from sleep. |
 <!-- /only -->
 <!-- only tc002 -->
 | `resetReason` | string | `poweron`, `software`, `panic`, `watchdog` | - | Why AWTRIX last started. `poweron`: switched on. `software`: AWTRIX restarted itself (update, restart from the web UI). `panic` or `watchdog`: AWTRIX crashed or hung and was restarted. |
 <!-- /only -->
+<!-- only rp2040 -->
+| `resetReason` | string | `poweron`, `external`, `software`, `watchdog`, `brownout`, `unknown` | - | Why AWTRIX last started. `poweron`: switched on. `external`: the RUN pin or a debugger. `software`: AWTRIX restarted itself (restart from the web UI, or waking from [timed sleep](../guides/power.md#timed-sleep)). `watchdog`: AWTRIX hung for about 8 seconds and was restarted. `brownout`: the supply voltage dropped too low, where the chip can tell. |
+<!-- /only -->
 | `freeHeapBytes` | integer | 0 … | bytes | Free memory right now. It changes all the time.<!-- only tc002 --> It is the memory the system can still give out.<!-- /only --> |
 | `minFreeHeapBytes` | integer | 0 … | bytes | The lowest free memory seen since the last start. It only goes down. A value that keeps dropping towards zero over days points to a problem; a stable value is fine.<!-- only tc002 --> It is checked about once a second, so a very short dip can be missed.<!-- /only --> |
 <!-- only esp32 esp32-s3 -->
 | `largestFreeBlockBytes` | integer | 0 … | bytes | The largest piece of free memory in one block. Installing a script or playing an HTTPS stream needs one large block. If AWTRIX says "not enough memory" although `freeHeapBytes` looks high, this value is the one that is too small. |
+<!-- /only -->
+<!-- only rp2040 -->
+| `largestFreeBlockBytes` | integer | 0 … | bytes | The free block at the top of the memory. Installing a script needs its memory in one piece. The Pico's allocator cannot list the free holes further down, so the true largest block can only be larger. |
 <!-- /only -->
 | `scriptingRunning` | boolean | - | - | Whether scripts run. `false` when [`scriptingEnabled`](system.md#miscellaneous) is off – installed scripts stay listed and editable, but none of them runs. |
 <!-- only esp32 esp32-s3 -->
@@ -318,6 +330,10 @@ These keys are in every response.
 <!-- only tc002 -->
 | `scriptHeapPool` | string | `system` | - | Which memory scripts use. |
 | `scriptHeapBudgetBytes` | integer | 0 … | bytes | How much memory all scripts together may use. When it is full, installing another script is refused. A quarter of the memory free at start, at most 4 MiB. Read the value instead of assuming it. |
+<!-- /only -->
+<!-- only rp2040 -->
+| `scriptHeapPool` | string | `internal`, `unavailable` | - | Which memory scripts use: `internal`, the one memory Wi-Fi, HTTP, MQTT and the display share. `unavailable` in an image built without scripting. |
+| `scriptHeapBudgetBytes` | integer | 0 … | bytes | How much memory all scripts together may use. When it is full, installing another script is refused. `49152` (48 KB) on the Pico W, `98304` (96 KB) on the Pico 2 W, `0` in an image built without scripting. Read the value instead of assuming it. |
 <!-- /only -->
 | `fps` | integer | 0 … | frames/second | Frames actually shown per second, measured once per second. It moves around. |
 | `brightness` | integer | 0 … 255 | - | The brightness the display uses **right now**. With `autoBrightness` off, or without a light sensor, it equals `settings.brightness`. With `autoBrightness` on and a light sensor, AWTRIX calculates it from `lightLevel` within `minBrightness`…`maxBrightness`, and `settings.brightness` is ignored. While the mood light is on, it is the mood light's `brightness`. Also shown as `brightness` in `GET /api/v1/display`. The value you set is in `GET /api/v1/settings`. |
@@ -518,7 +534,7 @@ tab. For the dots on the display see [Connection dots](#connection-dots).
 | `noWifi` | *(`mqtt` only)* AWTRIX is not on the network. | Fix Wi-Fi first; MQTT needs it. You see this only if you reach AWTRIX some other way. |
 | `hostNotFound` | For `wifi`: your network was not found. For `mqtt`: the broker name could not be resolved. | For Wi-Fi, check the network name and that the router is on. For MQTT, check the spelling. A `.local` name only works if something on your network answers for it – if in doubt, enter the broker's IP address. |
 | `refused` | *(`mqtt` only)* Nothing accepted a connection at that address and port. | Check the port, and that the broker runs and is reachable from AWTRIX's network. |
-| `badCredentials` | The password was rejected – by the router for `wifi`, by the broker for `mqtt`. | Enter the Wi-Fi password again, or `mqttUser` and `mqttPass`. |
+| `badCredentials` | The password was rejected – by the router for `wifi`, by the broker for `mqtt`.<!-- only rp2040 --> For `wifi` on the Galactic Unicorn: refused on two joins in a row, because its radio reports an access point that breaks off one join during the key exchange the same way, and the next join then connects.<!-- /only --> | Enter the Wi-Fi password again, or `mqttUser` and `mqttPass`. |
 | `rejected` | *(`mqtt` only)* The broker refused AWTRIX for another reason. | Check the broker's log. |
 | `timeout` | For `wifi`: the network did not answer in time while AWTRIX was starting. For `mqtt`: something answered at that address but it did not speak MQTT. | For Wi-Fi, usually range or a router that was still starting; AWTRIX keeps trying. For MQTT, usually the wrong port. |
 | `lost` | The connection was up and dropped. | For Wi-Fi, usually range or a router restart. For MQTT, the same or a broker restart. AWTRIX reconnects by itself. |
@@ -584,7 +600,7 @@ the same values.
 | `batteryVoltage`, `batteryPercent`, `lowBattery`, `usbPower` | whenever the clock reports its battery |
 <!-- /only -->
 | `fps` | once per second |
-| `uptimeSeconds`, `freeHeapBytes`, `minFreeHeapBytes`, <!-- only esp32 esp32-s3 -->`largestFreeBlockBytes`, <!-- /only -->`ipAddress`, `wifiRssi` | when you ask |
+| `uptimeSeconds`, `freeHeapBytes`, `minFreeHeapBytes`, <!-- only esp32 esp32-s3 rp2040 -->`largestFreeBlockBytes`, <!-- /only -->`ipAddress`, `wifiRssi` | when you ask |
 | `resetReason`, `hostname` | at startup |
 
 ## Platform capabilities

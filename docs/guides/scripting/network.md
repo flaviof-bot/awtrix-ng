@@ -3,6 +3,12 @@
 Fetch data from the internet, pick out the values you need, and talk to your smart home over
 MQTT.
 
+<!-- only rp2040 -->
+On the Galactic Unicorn the board has no script web requests yet: `http.*` and Modbus reads
+return `false`. Timers, storage, buttons, sound and MQTT work as described in this guide.
+
+<!-- /only -->
+
 ## What you get
 
 <a id="http"></a><a id="a-complete-fetch"></a>

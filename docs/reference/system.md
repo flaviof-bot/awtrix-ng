@@ -471,6 +471,19 @@ resulting size (`32 × 8 = 256 LEDs`) while you edit.
 If the picture is right but some colors are wrong, change `panelColorOrder`. Red and green swapped
 usually means an RGB panel with the default GRB order.
 <!-- /only -->
+<!-- only rp2040 -->
+## Panel {#panel-and-orientation}
+
+The Galactic Unicorn's display is built in: `panelWidth` is `53`, `panels` is `1`, and
+`panelHeight` is `11` or `8` (default `11`; at 8 the content is shown on rows 1–8). Any other
+value, or a change to where the panel starts, its wiring, its colour order or the chain keys, is
+refused with `422 validationFailed` naming the field. A height change applies after a reboot.
+`mirror` and `rotate` work as on every clock. Every pin is fixed too: a change to a `pin*` key,
+or switching on the DFPlayer, is refused with `400 invalidPinConfig`; see
+[Fixed wiring](../advanced/galactic-unicorn.md#fixed-wiring). A restored backup keeps the board's own pins and display size.
+
+<!-- /only -->
+
 <!-- only tc002 -->
 ## Panel {#panel-and-orientation}
 
@@ -600,7 +613,7 @@ Universe and pixel mapping, the five-second hold time and security notes are in
 | `tempDecimals` | uint8 | 0–2 | `0` | Number of decimal places in the Temperature app. Outside 0–2 → `422`. **Applies at once.** | no |
 <!-- /only -->
 | `debugMode` | bool | - | `false` | Writes detailed messages about requests and commands to the serial port and the log console. Off keeps the log short. **Applies at once.** | no |
-| `scriptingEnabled` | bool | - | `true` | Main switch for [scripts](../guides/scripting/index.md). Off<!-- only esp32 esp32-s3 --> frees about 40 KB of memory and<!-- /only --> no script runs. Your scripts are not deleted, and you can still **list, read, edit and delete** them – so you can fix a script that made the clock unreachable. Changes take effect after the next restart with the switch on again.<!-- only esp32 esp32-s3 --> To switch it off on the clock itself, hold **left + right** for three seconds while switching the clock on ([troubleshooting](../troubleshooting/troubleshooting.md#scripts-eat-the-memory-and-awtrix-never-comes-up)).<!-- /only --> | yes |
+| `scriptingEnabled` | bool | - | `true` | Main switch for [scripts](../guides/scripting/index.md). Off<!-- only esp32 esp32-s3 --> frees about 40 KB of memory and<!-- /only --> no script runs. Your scripts are not deleted, and you can still **list, read, edit and delete** them – so you can fix a script that made the clock unreachable. Changes take effect after the next restart with the switch on again.<!-- only esp32 esp32-s3 --> To switch it off on the clock itself, hold **left + right** for three seconds while switching the clock on ([troubleshooting](../troubleshooting/troubleshooting.md#scripts-eat-the-memory-and-awtrix-never-comes-up)).<!-- /only --><!-- only rp2040 --> To switch it off on the clock itself, hold **A and C** for three seconds while switching the clock on ([troubleshooting](../troubleshooting/troubleshooting.md#scripts-eat-the-memory-and-awtrix-never-comes-up)).<!-- /only --> | yes |
 
 Install, read and remove scripts with [`/api/v1/apps/script/{name}`](http.md#scripts); the script
 language is described in the [Scripting guide](../guides/scripting/index.md).

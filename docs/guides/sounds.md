@@ -18,6 +18,12 @@ See and hear it:
   <iframe src="https://www.youtube-nocookie.com/embed/djzf0yz76sc" title="AWTRIX NG Sound Showcase" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 </div>
 <!-- /only -->
+<!-- only rp2040 -->
+This page shows how to play melodies on your clock. The Galactic Unicorn has one sound output:
+melodies play through its built-in speaker, which `GET /api/v1/capabilities` reports as `rtttl`.
+It has no MP3, radio or DFPlayer, and its pins are fixed. To silence it, set the master
+`volume` to `0`. See the [Galactic Unicorn guide](../advanced/galactic-unicorn.md).
+<!-- /only -->
 
 A few words this page uses:
 

@@ -117,7 +117,7 @@ scripts at once, leave nothing for the rest.
 <!-- only esp32 esp32-s3 -->
 **Fix:**
 
-1. Hold **left and right together** while you switch AWTRIX on, and keep holding for three
+1. Hold **left and right together**<!-- only rp2040 --> (A and C on the Galactic Unicorn)<!-- /only --> while you switch AWTRIX on, and keep holding for three
    seconds. The display shows `NOSCR` and AWTRIX starts without running any script.
 2. Open the web UI. The **Scripts** tab still works: you can open, edit, save and delete scripts.
 3. Fix or delete the script that caused the problem.

@@ -140,6 +140,9 @@ How large a body may be and how many apps and notifications fit: [Limits](limits
 <!-- /only -->
 | 415 | no | Wrong `Content-Type` on a `PUT`/`PATCH`, or an uploaded file that does not match its folder. |
 | 422 | **no** | The first invalid value stops the whole request. A `PATCH` is applied completely or not at all. |
+<!-- only rp2040 -->
+| 431 | no | The request line and headers are longer than 2 KB. No body is sent, and the connection is closed. |
+<!-- /only -->
 | 500 | maybe | The action started and reported a failure. |
 <!-- only tc002 -->
 | 501 | no | This clock takes no updates over the network. |
@@ -649,6 +652,16 @@ Some switches need other keys first. Each answers `422 validationFailed` with th
 keys on this route are **ignored**, and other text fields are saved as sent.<!-- only esp32 esp32-s3 --> Pin conflicts -
 two functions on one pin, input-only pins, an unsupported LED data pin - answer
 `400 invalidPinConfig` instead; see [GPIO validation](#gpio-validation-invalidpinconfig).<!-- /only -->
+
+<!-- only rp2040 -->
+## GPIO validation (invalidPinConfig)
+
+Only `PUT /api/v1/system` returns this code. On the Galactic Unicorn every pin is part of the
+board: any pin change, or switching on the DFPlayer, is refused with the message
+`Galactic Unicorn (Pico W / Pico 2 W): pin assignments are fixed`, and nothing is saved. See
+[Fixed wiring](../advanced/galactic-unicorn.md#fixed-wiring).
+
+<!-- /only -->
 
 <!-- only esp32 esp32-s3 -->
 ## GPIO validation (invalidPinConfig)

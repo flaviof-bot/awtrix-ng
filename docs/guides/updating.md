@@ -39,6 +39,13 @@ The easiest way:
 A newer version number alone does not mean the release has a file for this clock. Without one, the
 button stays at **Check for updates**.
 
+<!-- only rp2040 -->
+A Galactic Unicorn cannot install from the browser. **Check for updates** still names a newer
+release and links its release notes, where its `.uf2` files are, and the Maintenance section
+explains the USB (BOOTSEL) route instead of offering **Upload firmware**. See
+[Galactic Unicorn → Flash over USB](../advanced/galactic-unicorn.md#flash-over-usb).
+<!-- /only -->
+
 ## Upload a file yourself
 
 ### Which file to download

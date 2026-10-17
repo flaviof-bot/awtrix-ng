@@ -143,6 +143,19 @@ curl -X PATCH http://<awtrix-ip>/api/v1/display \
 To see the current state, read `power` in `GET /api/v1/display` or `matrixPower` in
 `GET /api/v1/device`. Both are `false` while the display is off.
 
+<!-- only rp2040 -->
+## Timed sleep
+
+The Galactic Unicorn has no deep sleep. `POST /api/v1/device/sleep` with `durationMs` switches
+the display off, turns on the radio's power saving and pauses apps and requests, but the board
+stays powered, so it saves little. The timer or a new press of the **Sleep** key (GPIO27) ends
+it; a key already held when the sleep starts must be released first. Waking restarts AWTRIX,
+and `resetReason` then reads `software`. The Sleep key on its own just switches the display off
+and on, with apps and the network running. See
+[Galactic Unicorn → Sleep](../advanced/galactic-unicorn.md#sleep).
+
+<!-- /only -->
+
 <!-- only esp32 esp32-s3 -->
 ## Deep sleep
 

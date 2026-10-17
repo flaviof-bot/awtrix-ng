@@ -29,6 +29,21 @@ milliseconds with an `...Ms` suffix, the color forms (`"#RRGGBB"` out; `"RRGGBB"
 These keys are part of the system configuration, not the settings – see
 [System configuration](system.md). The MQTT client ID is the device **uid**.
 
+<!-- only rp2040 -->
+The Galactic Unicorn uses the same settings, topic names, retain flags and Home Assistant
+discovery as every AWTRIX NG clock. Restart after changing the broker settings. It resolves DNS
+and `.local` mDNS names; when a `.local` lookup fails it also tries DNS on the bare name. The
+Pico resolves names only with blocking calls, so each lookup can hold up the display for up to
+one second (two with that fallback). Connecting and writing time out after 300 ms, the broker's
+answer to a connect after two seconds, and the work in between feeds the eight-second hardware
+watchdog. A failed connection keeps the shared retry back-off.
+
+Discovery keeps the manufacturer `Blueforcer`, the model `AWTRIX NG` and the stock entity names,
+including `mqtt_prefix` and the left, select and right button sensors. The board adds the light
+sensor entities, and no battery or environment sensor. Commands for sound or scripts the board
+does not have answer with the shared capability errors.
+<!-- /only -->
+
 ### Topic prefix `<P>` {#the-prefix}
 
 `<P>` is the value of `mqttPrefix`. If you leave it empty, AWTRIX uses its uid – the
@@ -352,6 +367,10 @@ mosquitto_pub -h broker.local -t 'awtrixNG/cmd/device/reboot' -m ''
 
 A valid value answers `{"ok":true}` on `.../result`. Right after that AWTRIX goes into deep sleep
 and publishes nothing more.
+<!-- only rp2040 -->
+On the Galactic Unicorn the sleep is emulated, and the Sleep key (GPIO27) also ends it. See
+[Power → Timed sleep](../guides/power.md#timed-sleep).
+<!-- /only -->
 
 ```bash
 mosquitto_pub -h broker.local -t 'awtrixNG/cmd/device/sleep' \
