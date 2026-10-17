@@ -49,7 +49,7 @@ NG's median filter, light curve and automatic brightness policy.
 All nine keys are active low and debounced for 35 ms. B held for 500 ms opens
 the shared launcher; A/C step in it. Rotation and swapButtons follow ButtonRouter.
 D remains unmapped. Sleep, brightness and volume use the engine command path.
-Volume changes buzzerVolume, the tone setting used by AudioRouter; speaker wiring
+Volume steps the master `volume` (0-100 %), which AudioRouter applies to every group, tones included; speaker wiring
 comes in M5b. The webhook and A+C boot rescue are separate milestones.
 
 | Input | GPIO | Function |

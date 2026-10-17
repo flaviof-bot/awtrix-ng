@@ -51,12 +51,12 @@ void map_and_clamp() {
 }
 void extras_use_dispatcher_events() {
   Fixture f; auto& s=f.engine.state().settings();
-  s.brightness=250; s.autoBrightness=true; s.buzzerVolume=98;
+  s.brightness=250; s.autoBrightness=true; s.volume=98;
   f.press(7); TEST_ASSERT_EQUAL(255,s.brightness); TEST_ASSERT_FALSE(s.autoBrightness);
   f.press(8); TEST_ASSERT_EQUAL(245,s.brightness);
-  f.press(5); TEST_ASSERT_EQUAL(100,s.buzzerVolume); f.press(6); TEST_ASSERT_EQUAL(95,s.buzzerVolume);
-  s.brightness=2; s.buzzerVolume=2;
-  f.press(8); f.press(6); TEST_ASSERT_EQUAL(0,s.brightness); TEST_ASSERT_EQUAL(0,s.buzzerVolume);
+  f.press(5); TEST_ASSERT_EQUAL(100,s.volume); f.press(6); TEST_ASSERT_EQUAL(95,s.volume);
+  s.brightness=2; s.volume=2;
+  f.press(8); f.press(6); TEST_ASSERT_EQUAL(0,s.brightness); TEST_ASSERT_EQUAL(0,s.volume);
   TEST_ASSERT_EQUAL(6,f.settingsEvents);
   f.press(4); TEST_ASSERT_TRUE(f.engine.state().runtime().matrixOff);
   f.press(4); TEST_ASSERT_FALSE(f.engine.state().runtime().matrixOff); TEST_ASSERT_EQUAL(2,f.powerEvents);

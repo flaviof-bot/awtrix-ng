@@ -31,7 +31,7 @@ class GalacticUnicornControls {
           break;
         case InputAction::VolumeUp:
         case InputAction::VolumeDown:
-          c.payload = "{\"buzzerVolume\":" + std::to_string(stepClamped(s.buzzerVolume,
+          c.payload = "{\"volume\":" + std::to_string(stepClamped(s.volume,
               Inputs[i].action == InputAction::VolumeUp ? 5 : -5, 100)) + "}";
           break;
         default: continue; // D unmapped. A/B/C go through ButtonRouter below.
