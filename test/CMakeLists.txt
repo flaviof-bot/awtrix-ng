@@ -111,6 +111,9 @@ foreach(TEST_DIR IN LISTS TEST_DIRS)
   )
 endforeach()
 
+# Board lines through the shared log ring (fork issue #9).
+target_sources(test_boardlog PRIVATE "${AWTRIX_ROOT}/src/system/Log.cpp")
+
 add_executable(test_font_compact
   test_font/test_font.cpp
   "${AWTRIX_ROOT}/src/core/render/Canvas.cpp"

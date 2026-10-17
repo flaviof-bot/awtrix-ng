@@ -1,4 +1,5 @@
 #pragma once
+#include "hal/BoardLog.h"
 #include "hal/IBoard.h"
 #include "hal/GalacticUnicornDisplay.h"
 #include "hal/GalacticUnicornDefaults.h"
@@ -18,6 +19,11 @@ class GalacticUnicornBoard final : public IBoard {
   int matrixWidth() const override { return galactic::Width; }
   int matrixHeight() const override { return height_; }
   bool displayReady() const override { return ready_; }
+  // Where the board's boot and driver lines go (fork issue #9); none before this is set.
+  void setLog(BoardLogSink log) {
+    log_ = log;
+    tone_.setLog(log);
+  }
   void begin() override;
   void show(const Canvas&) override;
   // Logs whether the panel DMA still advances, after the radio has taken its PIO state machine.
@@ -64,6 +70,7 @@ class GalacticUnicornBoard final : public IBoard {
   alignas(4) volatile uintptr_t nextStream_ = 0;
   int front_ = 0;
   PIO pio_ = nullptr;
+  BoardLogSink log_ = nullptr;
   int sm_ = -1, dataDma_ = -1, controlDma_ = -1;
 };
 }

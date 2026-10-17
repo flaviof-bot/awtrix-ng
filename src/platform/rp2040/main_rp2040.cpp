@@ -44,6 +44,7 @@
 #include "system/Log.h"
 #include "system/Watchdog.h"
 #include "system/ApplicationBootstrap.h"
+#include "system/BoardLogSink.h"
 #include "system/GalacticUnicornControls.h"
 #include "core/net/DeviceUrl.h"
 #include "transport/DeviceStateJson.h"
@@ -286,24 +287,26 @@ void paceFrame() {
 void setup() {
   Serial.begin(115200);
   noise::reseed(get_rand_32());
-  Serial.printf("reset: %s\n", platform::resetReasonName());
+  // The log ring is static, so every line from here on reaches /api/v1/logs as well as serial.
+  logf("reset: %s", platform::resetReasonName());
   // Never wait for a USB host: the panel must boot with power alone.
   // Filesystem first: config, settings and palettes all come off it.
   g_storageReady = awtrix::fs::begin();
-  if (!g_storageReady) Serial.println("storage: mount failed; persistence unavailable");
+  if (!g_storageReady) logf("storage: mount failed; persistence unavailable");
   g_cfg = galacticUnicornDefaults();
   if (g_storageReady) {
     g_cfg.load();
     pico::installPaletteLoader();
   }
   if (g_cfg.panelHeight != 8 && g_cfg.panelHeight != 11) {
-    Serial.println("warning: Galactic Unicorn panelHeight must be 8 or 11; using 11");
+    logf("warning: Galactic Unicorn panelHeight must be 8 or 11; using 11");
     g_cfg.panelHeight = 11;
   }
   // A pin map or panel size stored by another build would make every PUT /api/v1/system fail.
   sysconfig::adoptFixedBoard(g_cfg);
   logbuf::setVerbose(g_cfg.debugMode);
   g_board = &activeBoard(g_cfg);
+  static_cast<GalacticUnicornBoard*>(g_board)->setLog(boardLogLine);
   g_audio.setTrack(g_board->trackSink());
   // Two independent decoders, as on ESP32, permit page transitions with icons.
   static DevicePageIcon pageIcon, pageIconB;
@@ -313,7 +316,7 @@ void setup() {
   g_builtinApps.reset(new DefaultApps);
   g_runtime.reset(new ApplicationRuntime(g_board->matrixWidth(), g_board->matrixHeight(), services,
                                           g_builtinApps->registry()));
-  if (!g_runtime->ready()) Serial.println("matrix: no frame memory");
+  if (!g_runtime->ready()) logf("matrix: no frame memory");
   g_board->begin();
   g_display.setScreen(&g_runtime->canvas());
   g_runtime->markSensors(*g_board);
@@ -328,9 +331,8 @@ void setup() {
   g_runtime->engine().state().runtime().tempDecimals = g_cfg.tempDecimals;
   g_runtime->bindOutputs(*g_board, g_settingsDirty);
   g_runtime->engine().state().emit(StateEvent::SettingsChanged);
-  Serial.printf("boot: AWTRIX NG %s on %s (%dx%d); PIO/DMA panel\n",
-                AWTRIX_NG_VERSION, g_board->name(), g_board->matrixWidth(),
-                g_board->matrixHeight());
+  logf("boot: AWTRIX NG %s on %s (%dx%d); PIO/DMA panel", AWTRIX_NG_VERSION, g_board->name(),
+       g_board->matrixWidth(), g_board->matrixHeight());
 #if AWTRIX_FEATURE_SCRIPTING
   // Before the watchdog is armed and long before the script host exists.
   holdingRescueAtBoot();

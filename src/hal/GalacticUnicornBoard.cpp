@@ -24,7 +24,8 @@ void GalacticUnicornBoard::begin() {
   }
   adc_init();
   adc_gpio_init(LightSensor);
-  if (invalidHeight_) Serial.println("warning: Galactic Unicorn panelHeight must be 8 or 11; using 11");
+  if (invalidHeight_)
+    boardLogf(log_, false, "warning: Galactic Unicorn panelHeight must be 8 or 11; using 11");
   // Keep blank asserted and select an invisible row throughout initialization/failure.
   for (uint pin = ColumnClock; pin <= Row3; ++pin) {
     gpio_init(pin);
@@ -38,7 +39,10 @@ void GalacticUnicornBoard::begin() {
     const int sm = pio_claim_unused_sm(candidate, false);
     if (sm >= 0) { pio_ = candidate; sm_ = sm; break; }
   }
-  if (!pio_) { Serial.println("display: no free PIO program/SM; panel remains blank"); return; }
+  if (!pio_) {
+    boardLogf(log_, false, "display: no free PIO program/SM; panel remains blank");
+    return;
+  }
   dataDma_ = dma_claim_unused_channel(false);
   controlDma_ = dma_claim_unused_channel(false);
   if (dataDma_ < 0 || controlDma_ < 0) {
@@ -46,7 +50,7 @@ void GalacticUnicornBoard::begin() {
     if (controlDma_ >= 0) dma_channel_unclaim(controlDma_);
     pio_sm_unclaim(pio_, sm_);
     pio_ = nullptr;
-    Serial.println("display: two DMA channels unavailable; panel remains blank");
+    boardLogf(log_, false, "display: two DMA channels unavailable; panel remains blank");
     return;
   }
   const uint offset = pio_add_program(pio_, &program);
@@ -104,12 +108,15 @@ void GalacticUnicornBoard::begin() {
   pio_sm_set_enabled(pio_, sm_, true);
   dma_start_channel_mask(1u << controlDma_);
   ready_ = true;
-  Serial.printf("display: PIO%u SM%d DMA%d+%d; CYW43 starts next\n",
-                pio_ == pio0 ? 0u : 1u, sm_, dataDma_, controlDma_);
+  boardLogf(log_, true, "display: PIO%u SM%d DMA%d+%d; CYW43 starts next",
+            pio_ == pio0 ? 0u : 1u, sm_, dataDma_, controlDma_);
 }
 
 void GalacticUnicornBoard::logRefreshProgress() const {
-  if (!ready_) { Serial.println("display: refresh unavailable after WiFi init"); return; }
+  if (!ready_) {
+    boardLogf(log_, false, "display: refresh unavailable after WiFi init");
+    return;
+  }
   const auto before = dma_hw->ch[dataDma_].read_addr;
   const auto start = time_us_64();
   bool advanced = false;
@@ -117,9 +124,10 @@ void GalacticUnicornBoard::logRefreshProgress() const {
     if (dma_hw->ch[dataDma_].read_addr != before) { advanced = true; break; }
     tight_loop_contents();
   }
-  Serial.printf("display: PIO%u SM%d DMA%d+%d after WiFi: refresh %s\n",
-                pio_get_index(pio_), sm_, dataDma_, controlDma_,
-                advanced ? "advancing" : "NOT advancing");
+  // The verdict is not verbose: it is the line that says the panel survived the radio's start.
+  boardLogf(log_, false, "display: PIO%u SM%d DMA%d+%d after WiFi: refresh %s",
+            pio_get_index(pio_), sm_, dataDma_, controlDma_,
+            advanced ? "advancing" : "NOT advancing");
 }
 
 int GalacticUnicornBoard::readLdrRaw() {

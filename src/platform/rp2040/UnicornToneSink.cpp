@@ -25,9 +25,10 @@ bool UnicornToneSink::open() {
   if (running_) return true;
   const auto beforeSm = smClaims(), beforeDma = dmaClaims();
   running_ = i2s_.begin(sound::ToneSamples::SampleRate);
-  Serial.printf("tone: %s; new PIO-SM mask 0x%lx, DMA mask 0x%lx\n",
-                running_ ? "ready" : "unavailable", (unsigned long)(smClaims() & ~beforeSm),
-                (unsigned long)(dmaClaims() & ~beforeDma));
+  // The claim masks are diagnostics; an amplifier that cannot start is not.
+  boardLogf(log_, running_, "tone: %s; new PIO-SM mask 0x%lx, DMA mask 0x%lx",
+            running_ ? "ready" : "unavailable", (unsigned long)(smClaims() & ~beforeSm),
+            (unsigned long)(dmaClaims() & ~beforeDma));
   return running_;
 }
 
