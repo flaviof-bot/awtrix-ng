@@ -5,6 +5,8 @@
 #include "persistence/DeviceConfig.h"
 #include "persistence/Filesystem.h"
 #include "persistence/RadioStore.h"
+#include "persistence/NvsSettings.h"
+#include "core/Settings.h"
 #include "platform/rp2040/PicoRestoreSink.h"
 
 // The production DeviceConfig, NvsSettings, LittleFS adapter and restore sink of the Pico, run
@@ -20,11 +22,11 @@ void legacy_panel_height_is_ignored_and_removed() {
   p.end();
   DeviceConfig cfg;
   cfg.load();
-  TEST_ASSERT_EQUAL(8, cfg.panelHeight);
+  TEST_ASSERT_EQUAL(11, cfg.panelHeight);
   TEST_ASSERT_TRUE(cfg.save());
   TEST_ASSERT_TRUE(p.begin("awtrix-cfg", true));
   TEST_ASSERT_FALSE(p.isKey("ph"));
-  TEST_ASSERT_EQUAL(8, p.getInt("pheight", -1));
+  TEST_ASSERT_EQUAL(11, p.getInt("pheight", -1));
   p.end();
 }
 
@@ -75,8 +77,18 @@ void config_and_settings_reboot_roundtrip() {
   TEST_ASSERT_EQUAL(32100, after.wifiConnectTimeout);
   TEST_ASSERT_TRUE(after.mqttEnabled);
   TEST_ASSERT_EQUAL(22, after.minBrightness);
-  // Settings are not round-tripped here: this target links the Linux build of the core, whose
-  // Settings layout differs from the Pico's, so nvs::saveSettings would mix the two.
+  Settings settings;
+  settings.applyRead(api::JsonReader(R"({"brightness":42})"));
+  TEST_ASSERT_EQUAL(42, settings.brightness);
+  nvs::saveSettings(settings);
+  Settings loaded;
+  nvs::loadSettings(loaded);
+  TEST_ASSERT_EQUAL(42, loaded.brightness);
+  std::string a, b;
+  api::JsonWriter wa(a), wb(b);
+  settings.writeMembers(wa);
+  loaded.writeMembers(wb);
+  TEST_ASSERT_EQUAL_STRING(a.c_str(), b.c_str());
   // A damaged snapshot is not half read: the defaults load instead.
   testFiles["/NVS/awtrix-cfg.bin"][0] ^= 1;
   DeviceConfig defaults;

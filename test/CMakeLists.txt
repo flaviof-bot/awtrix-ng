@@ -58,6 +58,14 @@ foreach(TEST_DIR IN LISTS TEST_DIRS)
       "${AWTRIX_ROOT}/src/platform/rp2040/include")
     target_compile_definitions("${TEST_NAME}" PRIVATE AWTRIX_PLATFORM_RP2040)
     target_sources("${TEST_NAME}" PRIVATE
+      "${AWTRIX_ROOT}/src/core/Settings.cpp"
+      "${AWTRIX_ROOT}/src/core/JsonColor.cpp"
+      "${AWTRIX_ROOT}/src/core/WeekdayBarConfig.cpp"
+      "${AWTRIX_ROOT}/src/core/payload/ScrollSpec.cpp"
+      "${AWTRIX_ROOT}/src/core/render/Color.cpp"
+      "${AWTRIX_ROOT}/src/core/render/ColorGrade.cpp"
+      "${AWTRIX_ROOT}/src/core/apps/BuiltinAppConfig.cpp"
+      "${AWTRIX_ROOT}/src/core/icons/IconOrigins.cpp"
       "${AWTRIX_ROOT}/src/platform/rp2040/LittleFsKv.cpp"
       "${AWTRIX_ROOT}/src/platform/rp2040/FilesystemRp2040.cpp"
       "${AWTRIX_ROOT}/src/platform/rp2040/DisabledStores.cpp"
@@ -72,8 +80,14 @@ foreach(TEST_DIR IN LISTS TEST_DIRS)
       "${AWTRIX_ROOT}/src/persistence/IconOriginsStore.cpp"
       "${AWTRIX_ROOT}/src/persistence/NvsSettings.cpp"
       "${AWTRIX_ROOT}/src/persistence/SystemConfigApply.cpp")
+    # No Linux-built core: Settings and every consumer use the Pico layout.
+    target_include_directories("${TEST_NAME}" PRIVATE "${AWTRIX_ROOT}/src")
+    target_compile_options("${TEST_NAME}" PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options("${TEST_NAME}" PRIVATE -Wl,--gc-sections)
+    target_link_libraries("${TEST_NAME}" PRIVATE awtrix_json unity awtrix_warnings)
+  else()
+    target_link_libraries("${TEST_NAME}" PRIVATE awtrix_core unity)
   endif()
-  target_link_libraries("${TEST_NAME}" PRIVATE awtrix_core unity)
   if(TEST_NAME STREQUAL "test_scripthost" OR TEST_NAME STREQUAL "test_scriptevents")
     target_link_libraries("${TEST_NAME}" PRIVATE awtrix_script_extensions)
   endif()
