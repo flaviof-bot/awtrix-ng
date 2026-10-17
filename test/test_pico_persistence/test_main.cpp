@@ -226,8 +226,10 @@ void fixed_board_system_config() {
   // Edited by hand, a pin past this chip's GPIOs is still out of range.
   TEST_ASSERT_FALSE(put(R"({"pinLdr":35})"));
   TEST_ASSERT_EQUAL_STRING("pinLdr", err.field.c_str());
-  // PR 2 (M3b): a restore keeps the board's panel, so a valid height in a backup is not taken.
+  // A valid restored height is taken; fixed width, wiring and pins stay the board's own.
   TEST_ASSERT_TRUE(put(R"({"panelHeight":11})", sysconfig::Origin::Restore));
+  TEST_ASSERT_EQUAL(11, cfg.panelHeight);
+  TEST_ASSERT_TRUE(put(R"({"panelHeight":8})", sysconfig::Origin::Restore));
   TEST_ASSERT_EQUAL(8, cfg.panelHeight);
 }
 void fixed_board_adopted_at_boot() {

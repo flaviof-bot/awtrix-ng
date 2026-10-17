@@ -26,8 +26,11 @@ bool apply(DeviceConfig& cfg, api::JsonReader obj, int& applied, ApplyError& err
     auto r = obj;
     if (r.enterObject()) while (r.nextMember()) {
       const std::string key(r.key());
-      if (key.compare(0, 3, "pin") != 0 && key.compare(0, 5, "panel") != 0)
-        w.key(key.c_str()).raw(r.valueText());
+      // Restore only heights this fixed panel supports; all other panel/pin keys stay local.
+      const std::string value(r.valueText());
+      const bool validHeight = key == "panelHeight" && (value == "8" || value == "11");
+      if (validHeight || (key.compare(0, 3, "pin") != 0 && key.compare(0, 5, "panel") != 0))
+        w.key(key.c_str()).raw(value);
       if (!r.skipValue()) break;
     }
     w.endObject();
