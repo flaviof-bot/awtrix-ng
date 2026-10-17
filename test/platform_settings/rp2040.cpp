@@ -1,6 +1,5 @@
 #include <unity.h>
 
-#include "persistence/DeviceConfigJson.h"
 #include "persistence/SystemConfigApply.h"
 #include "platform/rp2040/Rp2040Profile.h"
 
