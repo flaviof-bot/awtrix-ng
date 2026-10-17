@@ -99,9 +99,65 @@ An unset address reads `0.0.0.0`, as on ESP32.
 After a successful STA boot, mDNS publishes `<hostname>.local`, `_http._tcp`
 and `_awtrixng._tcp` on the configured web port (default 80), with the same
 `id` (lowercase MAC without colons), `name` and `type=awtrixng` TXT records.
-LEAmDNS is polled every loop. These records match ESP32, but **HTTP and its
-provisioning form are not wired yet** (M4b): joining the AP cannot save
-credentials yet and a phone may report no Internet/no working portal.
+LEAmDNS is polled every loop. These records match ESP32. The shared HTTP
+server serves the embedded, gzip-compressed web UI and `/api/v1` on port 80
+in AP mode, or `webPort` (default 80) after a station-mode boot.
+
+### Provision from a phone
+
+1. Power on without saved credentials, or hold **B / SELECT** for one second
+   during boot. Join the open `awtrixng-xxxxxx` Wi-Fi network (or your saved
+   hostname). Accept the phone's **stay connected without Internet** prompt.
+2. Open the captive portal, or explicitly browse to **http://192.168.4.1/**.
+   The setup form offers Wi-Fi scanning or manual SSID entry. Enter your
+   network name and password and save the changes.
+3. Use the form's **Reboot** action to join immediately. Alternatively disconnect
+   the phone from the AP: every 60 seconds the Pico pauses the AP for a
+   station-only join, and once it joins the saved network it reboots. Retries
+   deliberately pause while a phone remains attached, so do not wait on the
+   open portal.
+4. Rejoin your normal Wi-Fi and open **http://awtrixng-xxxxxx.local/** (or
+   `http://<configured-hostname>.local:<webPort>/`). If mDNS is unavailable,
+   use the address shown in the router's DHCP lease list or USB serial log.
+5. Verify the API with `curl -i http://awtrixng-xxxxxx.local/api/v1/device`.
+   Expect HTTP 200 and JSON containing `uid`, `soc` (`rp2040`), `ipAddress`,
+   `freeHeapBytes` and `resetReason`. Add the configured port and Basic auth if
+   you enabled them.
+
+### HTTP port notes
+
+The shared API enforces the same 8 KiB ordinary-body limit (413), JSON content
+type checks (415), settings validation (422) and provisioning-mode admission as
+on ESP32. The Pico WebServer uses its `HTTPServer&` request hooks, including
+`canRaw`; larger bodies stream into the fixed arena instead of an unbounded
+String. File and melody listings use LittleFS's File API rather than an ESP VFS
+mount, and file hashes use BearSSL's SHA-256. Scripting, MP3 and radio routes
+keep the shared 503 `unavailable` policy. `/update` answers 503 `unavailable`
+with an instruction to flash a **UF2 over USB using BOOTSEL**: browser OTA is not
+supported. `updateImage` names the UF2 for this board
+(`firmware-galactic-unicorn.uf2` or `firmware-galactic-unicorn-2w.uf2`); use it,
+not an ESP32 `.bin` image.
+
+Device heap facts use `rp2040.getFreeHeap()`. `minFreeHeapBytes` is the minimum
+sampled by device-state requests, not an allocator-wide low-water mark.
+`largestFreeBlockBytes` is the free block at the top of the heap: newlib cannot
+list the holes further down, so the true largest block can only be larger.
+PSRAM facts are omitted. `scriptHeapPool` is `unavailable` with a budget of 0.
+The body-copy guard checks total free heap on the Pico, not the largest block.
+
+arduino-pico's lwIP has five TCP pcbs. The listener runs at its clients' TCP
+priority, so a SYN that finds the pool full is dropped (the browser retries)
+instead of aborting a live client, and lwIP's `accept(NULL, ERR_MEM)` for that
+SYN never reaches `WiFiServer`. The firmware links `_printf_float`; without it
+every float in the JSON API renders empty and the web UI falls back to
+provisioning mode.
+
+Uploading, deleting or restoring an asset drops the cached icons and palettes,
+as on ESP32, and a `mirror` or `rotate` change applies live. A restored backup
+keeps the board's pins, panel and Wi-Fi; nested icon folders
+(`/ICONS/sub/smile.gif`) restore. At boot a pin map or panel size stored by
+another build is replaced by the board's own, so it cannot make every later
+`PUT /api/v1/system` fail.
 
 ## Time, reset and sleep
 
@@ -116,7 +172,8 @@ from Pico SDK `get_rand_32()` hardware entropy at boot.
 Reset reporting uses the framework's best-effort cause: power-on → `poweron`,
 watchdog → `watchdog`, reboot → `software`, RUN pin/debug → `external`,
 brownout → `brownout` when distinguishable, otherwise `unknown`. ESP32 values
-are unchanged. Pico boot logs report this reason (`reset: ...`).
+are unchanged. Pico boot logs (`reset: ...`) and `/api/v1/device` report this
+reason.
 
 The Pico has **no ESP32-style deep sleep with GPIO wake**; `POST
 /api/v1/device/sleep` is **emulated**. Like a reboot it runs after the display
@@ -138,7 +195,7 @@ The Pico binding uses WiFiUDP behind the shared `UdpSocket`, so the protocol
 code is the ESP32's. Art-Net takes over below the power and AP screens and
 returns to apps five seconds after the last frame. Universes start at zero and
 hold 170 RGB pixels each, continuing across the 53x11 canvas. Discovery
-advertises the web port; the HTTP server itself comes in M4b.
+advertises the shared HTTP server's web port.
 
 Hardware acceptance: flash the UF2, check the SSID/AP MODE behavior above,
 capture display and CYW43 PIO/SM logs plus `refresh advancing`, then check the
