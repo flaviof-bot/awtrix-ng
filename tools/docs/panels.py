@@ -101,6 +101,10 @@ def picture(host, panel):
     return svg
 
 
+def svg_path(name, job):
+    return DOCS / examples.asset_dir(job.size) / (name + ".svg")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--only", choices=list(only.VARIANTS))
@@ -110,15 +114,16 @@ def main():
     parser.add_argument("--binary", default=str(REPO / "build" / "host" / "awtrix-linux"))
     args = parser.parse_args()
 
-    target = DOCS / examples.ASSET_DIR
-    target.mkdir(parents=True, exist_ok=True)
+    folders = [DOCS / examples.ASSET_DIR] + [DOCS / f for f in examples.OWN_ASSET_DIRS.values()]
+    for folder in folders:
+        folder.mkdir(parents=True, exist_ok=True)
     try:
         jobs = collect(DOCS, [args.only] if args.only else list(only.VARIANTS))
     except (only.OnlyError, examples.PanelError) as error:
         print(error, file=sys.stderr)
         return 1
     todo = {name: job for name, job in jobs.items()
-            if args.force or args.check or not (target / (name + ".svg")).exists()}
+            if args.force or args.check or not svg_path(name, job).exists()}
     problems = []
     for size in sorted({job.size for job in todo.values()}):
         try:
@@ -132,7 +137,7 @@ def main():
                     except panel_host.HostError as error:
                         problems.append("%s: %s" % (where, error))
                         continue
-                    path = target / (name + ".svg")
+                    path = svg_path(name, job)
                     if args.check:
                         old = frame0(path.read_text(encoding="utf-8")) if path.exists() else None
                         result = verdict(old, frame0(svg),
@@ -148,7 +153,7 @@ def main():
         except (OSError, AssertionError) as error:
             problems.append("awtrix-linux %dx%d: %s" % (size[0], size[1], error))
     if not args.only and not args.check:
-        for stale in sorted(target.glob("*.svg")):
+        for stale in sorted(p for folder in folders for p in folder.glob("*.svg")):
             if stale.stem not in jobs:
                 stale.unlink()
                 print("removed %s" % stale.relative_to(REPO).as_posix())

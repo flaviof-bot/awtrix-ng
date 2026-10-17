@@ -55,6 +55,7 @@ CLOCKS = [
 
 ROOT_ONLY_STATIC = ("firmware/",)
 TC002_ONLY_STATIC = ("assets/tc002/image/",)
+RP2040_ONLY_STATIC = tuple(d + "/" for d in panel_examples.OWN_ASSET_DIRS.values())
 
 CLOCKS_MARKER = re.compile(r"^<!--\s*clocks\s*-->[ \t]*$", re.M)
 HEADING = re.compile(r"^#\s+(.+?)(?:\s+\{[^}]*\})?\s*#*\s*$")
@@ -165,6 +166,8 @@ def on_files(files, config):
         if path.startswith(ROOT_ONLY_STATIC):
             continue
         if variant != "tc002" and path.startswith(TC002_ONLY_STATIC):
+            continue
+        if variant != "rp2040" and path.startswith(RP2040_ONLY_STATIC):
             continue
         if variant == ROOT and path.startswith("api/"):
             continue

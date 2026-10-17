@@ -21,6 +21,9 @@ from dataclasses import dataclass
 
 SIZES = {"esp32": (32, 8), "esp32-s3": (32, 8), "tc002": (52, 16), "rp2040": (53, 11)}
 ASSET_DIR = "assets/panels"
+# A clock whose pictures no other clock shows keeps them apart, so that the other builds leave
+# them out (variants.py drops the folder from every other build).
+OWN_ASSET_DIRS = {"rp2040": ASSET_DIR + "/rp2040"}
 STYLES = ("led", "diagram")
 ALT = {
     "script": "What the script shows on the display",
@@ -193,8 +196,15 @@ def picture_hash(panel, size):
     return hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
 
 
+def asset_dir(size):
+    for clock, folder in OWN_ASSET_DIRS.items():
+        if SIZES[clock] == size:
+            return folder
+    return ASSET_DIR
+
+
 def picture_path(panel, size):
-    return "%s/%s.svg" % (ASSET_DIR, picture_hash(panel, size))
+    return "%s/%s.svg" % (asset_dir(size), picture_hash(panel, size))
 
 
 def insert_figures(markdown, variant, page, exists, origin=None):

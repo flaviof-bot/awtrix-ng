@@ -102,6 +102,10 @@ class Pictures(unittest.TestCase):
         self.assertNotEqual(first, pe.picture_hash(self.panel, (52, 16)))
         self.assertNotEqual(first, pe.picture_hash(self.panel, pe.SIZES["rp2040"]))
         self.assertEqual((53, 11), pe.SIZES["rp2040"])
+
+    def test_galactic_unicorn_pictures_have_their_own_folder(self):
+        self.assertTrue(pe.picture_path(self.panel, (53, 11)).startswith("assets/panels/rp2040/"))
+        self.assertRegex(pe.picture_path(self.panel, (52, 16)), r"^assets/panels/[0-9a-f]{12}\.svg$")
         self.assertNotEqual(first, pe.picture_hash(diagram, (32, 8)))
         self.assertRegex(first, "^[0-9a-f]{12}$")
 
