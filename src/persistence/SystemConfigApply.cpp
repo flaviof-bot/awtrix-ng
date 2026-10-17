@@ -83,6 +83,12 @@ bool apply(DeviceConfig& cfg, api::JsonReader obj, int& applied, ApplyError& err
   }
 #endif
   std::string pinErr;
+#if defined(AWTRIX_PLATFORM_RP2040)
+  if (!merged.validatePins(pinErr)) {
+    err = {422, "validationFailed", pinErr, "pinMatrix"};
+    return false;
+  }
+#endif
   if (merged.gpioConfigurable && !merged.validatePins(pinErr)) {
     err = {400, "invalidPinConfig", pinErr, ""};
     return false;

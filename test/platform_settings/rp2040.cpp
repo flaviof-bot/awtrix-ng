@@ -32,6 +32,22 @@ static void panel_heights_and_capabilities() {
   TEST_ASSERT_TRUE(cfg.mirror && cfg.rotate);
 }
 
+static void interactive_edits_reject_pins_atomically() {
+  for (const char* body : {R"({"pinMatrix":99})", R"({"pinBuzzer":5})",
+                          R"({"pinBtnLeft":-1,"mqttHost":"not-applied"})",
+                          R"({"pinLdr":35})", R"({"pinI2sBclk":12})"}) {
+    DeviceConfig cfg;
+    sysconfig::ApplyError err;
+    int n;
+    TEST_ASSERT_FALSE(sysconfig::apply(cfg, api::JsonReader(body), n, err));
+    TEST_ASSERT_EQUAL(422, err.status);
+    TEST_ASSERT_EQUAL_STRING("validationFailed", err.code.c_str());
+    TEST_ASSERT_TRUE(cfg.mqttHost.empty());
+    TEST_ASSERT_EQUAL(0, cfg.pinBtnLeft);
+    TEST_ASSERT_EQUAL(-1, cfg.pinMatrix);
+  }
+}
+
 static void fixed_pin_profile() {
   DeviceConfig cfg;
   std::string err;
@@ -63,6 +79,7 @@ int main() {
   UNITY_BEGIN();
   RUN_TEST(panel_heights_and_capabilities);
   RUN_TEST(fixed_pin_profile);
+  RUN_TEST(interactive_edits_reject_pins_atomically);
   RUN_TEST(restores_an_esp32_backup_with_its_own_wiring);
   return UNITY_END();
 }

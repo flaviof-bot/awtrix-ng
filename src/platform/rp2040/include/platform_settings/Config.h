@@ -14,7 +14,7 @@ struct PlatformConfig {
   static constexpr bool panelConfigurable = true;
   static constexpr bool gpioConfigurable = false;
   static constexpr bool validate(cfgrules::ConfigError&) { return true; }
-  static constexpr bool offers(ConfigNeed need) { return need != ConfigNeed::Gpio; }
+  static constexpr bool offers(ConfigNeed) { return true; }
   static bool offers(std::string_view key);
   using Ignore = bool (*)(std::string_view, const void*);
   static constexpr Ignore ignoredFields() { return ignore; }
