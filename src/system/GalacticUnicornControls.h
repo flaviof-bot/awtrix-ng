@@ -49,6 +49,8 @@ class GalacticUnicornControls {
   // The buttonCallback webhook: A, B and C report every press and release, as on an ESP32.
   using ButtonPost = void (*)(const std::string& url, int button, bool pressed);
   void setButtonPost(ButtonPost post) { post_ = post; }
+  // Scripts see A, B and C before the menu does, as through the ESP32's PeripheryService.
+  void setButtonHook(input::ButtonRouter::ScriptHook hook) { input_.setButtonHook(std::move(hook)); }
   // Same median and light-curve input as ESP32 PeripheryService, sampled at 100 ms.
   void sampleLight(CoreEngine& engine, int raw, int64_t nowMs) {
     if (nowMs - lastLdrMs_ < 100) return;

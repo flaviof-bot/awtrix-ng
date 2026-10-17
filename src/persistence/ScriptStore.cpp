@@ -52,7 +52,7 @@ void LittleFsFiles::saveSource(const std::string& name, const std::string& sourc
 }
 
 void LittleFsFiles::forEachName(const NameVisitor& visit) {
-  File dir = LittleFS.open("/SCRIPTS");
+  File dir = LittleFS.open("/SCRIPTS", "r"); // arduino-pico has no default mode
   if (!dir || !dir.isDirectory()) return;
   for (File file = dir.openNextFile(); file; file = dir.openNextFile()) {
     if (file.isDirectory()) continue;

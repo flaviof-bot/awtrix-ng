@@ -20,6 +20,9 @@
 #include "core/render/PaletteStore.h"
 #include "core/render/ProvisioningScreen.h"
 #include "core/render/TextRenderer.h"
+#include "core/script/ScriptHeap.h"
+#include "core/script/ScriptHost.h"
+#include "core/script/ScriptSlots.h"
 #include "hal/BoardRegistry.h"
 #include "hal/GalacticUnicornBoard.h"
 #include "hal/IBoard.h"
@@ -28,6 +31,7 @@
 #include "persistence/AppOrderStore.h"
 #include "persistence/Filesystem.h"
 #include "persistence/NvsSettings.h"
+#include "persistence/ScriptStore.h"
 #include "persistence/SystemConfigApply.h"
 #include "platform/BuildFeatures.h"
 #include "platform/rp2040/PaletteFiles.h"
@@ -35,6 +39,7 @@
 #include "platform/rp2040/RadioStartup.h"
 #include "platform/rp2040/ResetReason.h"
 #include "platform/rp2040/Rp2040Profile.h"
+#include "platform/rp2040/ScriptHeapRp2040.h"
 #include "platform/rp2040/TimeService.h"
 #include "system/Log.h"
 #include "system/Watchdog.h"
@@ -42,6 +47,7 @@
 #include "system/GalacticUnicornControls.h"
 #include "core/net/DeviceUrl.h"
 #include "transport/DeviceStateJson.h"
+#include "transport/ScriptMqttBridge.h"
 #include "transport/mqtt/MqttService.h"
 #include "transport/net/ArtnetService.h"
 #include "transport/net/DiscoveryService.h"
@@ -54,8 +60,9 @@
 #include <pico/rand.h>
 #include "system/MonotonicClock.h"
 
-// Feature macros describe this build, not a claim that a runtime service exists.
-static_assert(!AWTRIX_FEATURE_SCRIPTING && !AWTRIX_FEATURE_MP3 &&
+// Feature macros describe this build, not a claim that a runtime service exists. Scripting is on
+// unless build_flags turn it off (-D AWTRIX_FEATURE_SCRIPTING=0); the rest stay out.
+static_assert(!AWTRIX_FEATURE_MP3 &&
               !AWTRIX_FEATURE_RADIO && !AWTRIX_FEATURE_OUTBOUND_TLS &&
               !AWTRIX_FEATURE_BROWSER_OTA, "Pico build must not enable unsupported services");
 
@@ -153,6 +160,14 @@ NetworkService g_net;
 HttpApiServer g_http;
 MqttService g_mqtt;
 std::unique_ptr<net::IHostResolver> g_hostResolver;
+// The ESP32's script wiring less its HTTP worker (#6): script http.* and Modbus reads return false.
+ScriptMqttBridge g_scriptMqtt;
+ScriptStore<> g_scriptStore;
+script::ScriptServices g_scriptSvc;
+script::ScriptHost* g_scripts = nullptr;
+#if AWTRIX_FEATURE_SCRIPTING
+script::ScriptSlots g_scriptSlots;
+#endif
 
 // Holding B (select) for one second at boot forces the provisioning AP without erasing the stored
 // credentials, as on the ESP32. The runtime hold of B (the launcher) only starts in loop().
@@ -173,6 +188,67 @@ bool holdingSelectAtBoot() {
   logf("boot: SELECT held, forcing provisioning AP (credentials kept)");
   return true;
 }
+
+#if AWTRIX_FEATURE_SCRIPTING
+// Rescue combo, as on the ESP32: hold A and C (left and right) for three seconds at power-on to
+// turn scripting off and persist that, the way back from a script that takes the device down.
+bool holdingRescueAtBoot() {
+  ButtonState buttons;
+  g_board->pollButtons(buttons);
+  if (!buttons.left || !buttons.right) return false;
+  const unsigned long start = millis();
+  while (millis() - start < 3000) {
+    g_board->pollButtons(buttons);
+    if (!buttons.left || !buttons.right) return false;
+    delay(20);
+  }
+  Canvas& canvas = g_runtime->canvas();
+  canvas.clear(0x000000u);
+  text::drawText(canvas, awtrixFont(), 0, 6, "NOSCR", 0xFF3000u);
+  g_board->show(canvas);
+  if (g_cfg.scriptingEnabled) {
+    g_cfg.scriptingEnabled = false;
+    if (g_storageReady) g_cfg.save();
+  }
+  logf("boot: LEFT+RIGHT held, scripting disabled (re-enable in the web UI)");
+  delay(1500);
+  return true;
+}
+
+// As main.cpp does. Every call into the VM is bounded by BerryVM::kInstructionLimit and returns
+// to loop(), which feeds the watchdog.
+void beginScripts() {
+  g_runtime->configureScripts(g_scriptSvc);
+  g_scriptSvc.mqtt = &g_scriptMqtt;
+  g_scriptSvc.storeSink = &g_scriptStore;
+  g_scriptSvc.readSource = [](const std::string& name, std::string& out) {
+    return g_scriptStore.readSource(name, out);
+  };
+  g_scriptSvc.readStore = [](const std::string& name, std::string& out) {
+    return g_scriptStore.readStore(name, out);
+  };
+  g_scriptSvc.monotonicMs = [] { return monotonicMs(); };
+  // Script output goes through the shared log, so it reaches /api/v1/logs.
+  g_scriptSvc.log = [](const std::string& text) { logf("%s", text.c_str()); };
+  g_scriptSvc.logDebug = [](const std::string& text) { logdbg("%s", text.c_str()); };
+  g_scriptSvc.freeHeap = [] { return static_cast<std::size_t>(rp2040.getFreeHeap()); };
+  g_scriptSvc.maxAllocHeap = [] { return script::heap::picoLargestFreeBlock(); };
+  g_mqtt.setScriptingRunning(g_cfg.scriptingEnabled);
+  g_scriptSlots.begin(*g_runtime, g_scriptSvc, g_cfg.scriptingEnabled,
+      [](const std::string& name, const std::string& source) { g_scriptStore.save(name, source); },
+      [](const std::string& name) { g_scriptStore.remove(name); });
+  g_scripts = g_scriptSlots.host();
+  if (g_scripts) {
+    bootstrap::bindScriptMqtt(*g_scripts, g_mqtt, g_scriptMqtt);
+    bootstrap::restoreScripts(*g_scripts, g_scriptStore, script::kFirstLoopStaggerMs);
+  } else {
+    logf("scripts: disabled by configuration (sources stay editable)");
+  }
+  g_http.setScripts(g_scripts, g_scriptSvc.readSource, g_scriptSvc.readStore,
+                    [] { return g_scriptStore.storedScripts(); });
+  bootstrap::bindScriptButtons(g_controls, g_runtime->engine(), g_scripts);
+}
+#endif
 
 PlatformDescriptor platformDescriptor() {
   PlatformDescriptor platform{"rp2040", {g_board->matrixWidth(), g_board->matrixHeight(), true},
@@ -255,6 +331,14 @@ void setup() {
   Serial.printf("boot: AWTRIX NG %s on %s (%dx%d); PIO/DMA panel\n",
                 AWTRIX_NG_VERSION, g_board->name(), g_board->matrixWidth(),
                 g_board->matrixHeight());
+#if AWTRIX_FEATURE_SCRIPTING
+  // Before the watchdog is armed and long before the script host exists.
+  holdingRescueAtBoot();
+  {
+    const script::heap::Info h = script::heap::info();
+    logf("scripts: Berry heap in %s, budget %u KB", h.name, (unsigned)(h.budgetBytes / 1024));
+  }
+#endif
   const int64_t bootT0 = monotonicMs();
   auto showBootLogo = [bootT0] {
     watchdog::feed();
@@ -310,6 +394,9 @@ void setup() {
   });
   g_mqtt.setWebUrl([webPort] { return net::deviceUrl(g_net.ip(), webPort); });
   bootstrap::bindDisplay(g_display, g_runtime->canvas(), g_mqtt);
+#if AWTRIX_FEATURE_SCRIPTING
+  beginScripts();
+#endif
 #if AWTRIX_PICO_UDP
   if (g_netWasConnected) {
     g_disco.begin(g_net.hostname(), g_cfg.webPort);
@@ -345,7 +432,8 @@ void loop() {
     g_settingsDirty = false;
     g_settingsSaver.saved(now);
   }
-  g_runtime->tick(now); // M6a: the script host.
+  g_runtime->tick(now, g_scripts);
+  g_scriptStore.tick(now);
   const bool artnetFrame = g_runtime->render(now, [](Canvas& canvas, int64_t frameMs, void*) {
     if (g_net.apMode()) {
       render::drawProvisioningScreen(canvas, awtrixFont(), frameMs);
@@ -362,6 +450,8 @@ void loop() {
     // A requested reboot or sleep keeps pending settings, unless a reset just removed them.
     if (g_settingsDirty && g_storageReady && !g_system.resetPending)
       nvs::saveSettings(g_runtime->engine().state().settings());
+    // Anything a script saved in its last seconds is written first, as on the ESP32.
+    g_scriptStore.flush();
     g_system.restart(*g_board, g_runtime->canvas());
   }
   // An Art-Net sender sets its own frame rate, as on the ESP32.
