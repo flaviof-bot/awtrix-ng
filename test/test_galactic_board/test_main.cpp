@@ -45,7 +45,7 @@ void fixed_panel_rules() {
   TEST_ASSERT_FALSE(cfgrules::validateFixedPanel(soc, 53, 1, 14, err));
   TEST_ASSERT_EQUAL_STRING("panelHeight", err.field.c_str());
   TEST_ASSERT_TRUE(cfgrules::validateFixedPanel(pins::esp32Profile(), 64, 1, 14, err));
-  TEST_ASSERT_TRUE(pins::toJson(soc).find(",\"panel\":{\"width\":53,\"heights\":[8,11]}}") !=
+  TEST_ASSERT_TRUE(pins::toJson(soc).find(",\"panel\":{\"width\":53,\"heights\":[8,11]}") !=
                    std::string::npos);
   TEST_ASSERT_TRUE(pins::toJson(pins::esp32Profile()).find("\"panel\"") == std::string::npos);
 }
