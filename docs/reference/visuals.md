@@ -41,7 +41,7 @@ AWTRIX has **19 background effects**:
 | `TheaterChase` | Every third column lit, the lights marching sideways over a rainbow | yes |
 | `Fade` | Horizontal color bands from top to bottom, all slowly cycling through the colors | yes |
 | `MovingLine` | A full-width line bouncing up and down, with a short glow behind it | yes |
-| `BrickBreaker` | Breakout that plays itself: the ball bounces off the paddle and clears the rows of bricks, then the wall is rebuilt. The palette colors the brick rows | yes |
+| `BrickBreaker` | Breakout that plays itself: bricks are 3 LEDs with a 1-LED gap and each hit knocks out one. The ball leaves the middle of the paddle at 45 degrees and its edges at a shallow angle; a cleared wall is rebuilt. The palette colors the brick rows | yes |
 | `PingPong` | Pong that plays itself: two paddles return a red ball, and now and then one misses | **no** |
 | `Radar` | A beam sweeping clockwise round the center with a fading afterglow; green by default | yes |
 | `Checkerboard` | A checkerboard in two colors that drift through the palette | yes |
