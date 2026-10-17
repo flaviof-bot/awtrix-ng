@@ -57,7 +57,7 @@ bool cfgPut(nvs_handle_t h, const char* k, PanelColorOrder v) {
 // they stop occupying entries in the NVS partition.
 const char* const kLegacyMatrixKeys[] = {"mwidth", "matlay", "mtilew", "morient", "mserp",
                                          "mflipx", "mflipy", "ph",     "pnx",     "pny",
-                                         "cserp",  "pheight"};
+                                         "cserp"};
 }
 
 // Every key defaults to whatever the member already holds, so a config written by an older

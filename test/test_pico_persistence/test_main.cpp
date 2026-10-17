@@ -1,5 +1,4 @@
 #include <unity.h>
-#include <cstdio>
 
 #include <Preferences.h>
 
@@ -7,7 +6,6 @@
 #include "core/StateStore.h"
 #include "core/api/JsonWriter.h"
 #include "persistence/DeviceConfig.h"
-#include "persistence/DeviceConfigRows.h"
 #include "persistence/Filesystem.h"
 #include "persistence/NvsSettings.h"
 #include "persistence/RadioStore.h"
@@ -19,26 +17,41 @@ using namespace awtrix;
 void setUp() { testFiles.clear(); testDirs.clear(); failWrite = failRename = false; }
 void tearDown() {}
 
-void legacy_matrix_keys_are_removed() {
+void legacy_panel_height_is_ignored_and_removed() {
   Preferences p;
   TEST_ASSERT_TRUE(p.begin("awtrix-cfg", false));
   p.putInt("ph", 16);
-  p.putInt("mwidth", 64);
   p.end();
   DeviceConfig cfg;
   cfg.load();
-  const bool saved = cfg.save();
-  if (!saved) {
-    Preferences check;
-    TEST_ASSERT_TRUE(check.begin("awtrix-cfg", true));
-    for (const auto& row : configfields::kRows)
-      if (!check.isKey(row.nvsKey)) std::printf("missing %s\n", row.nvsKey);
-    check.end();
-  }
-  TEST_ASSERT_TRUE(saved);
+  TEST_ASSERT_EQUAL(8, cfg.panelHeight);
+  TEST_ASSERT_TRUE(cfg.save());
   TEST_ASSERT_TRUE(p.begin("awtrix-cfg", true));
   TEST_ASSERT_FALSE(p.isKey("ph"));
-  TEST_ASSERT_FALSE(p.isKey("mwidth"));
+  TEST_ASSERT_EQUAL(8, p.getInt("pheight", -1));
+  p.end();
+}
+
+void panel_height_uses_fresh_key() {
+  DeviceConfig cfg;
+  cfg.panelHeight = 11;
+  TEST_ASSERT_TRUE(cfg.save());
+  Preferences p;
+  TEST_ASSERT_TRUE(p.begin("awtrix-cfg", true));
+  TEST_ASSERT_EQUAL(11, p.getInt("pheight", -1));
+  TEST_ASSERT_FALSE(p.isKey("ph"));
+  p.end();
+  // A stale legacy value must not override the fresh key either.
+  TEST_ASSERT_TRUE(p.begin("awtrix-cfg", false));
+  p.putInt("ph", 16);
+  p.end();
+  DeviceConfig loaded;
+  loaded.load();
+  TEST_ASSERT_EQUAL(11, loaded.panelHeight);
+  TEST_ASSERT_TRUE(loaded.save());
+  TEST_ASSERT_TRUE(p.begin("awtrix-cfg", true));
+  TEST_ASSERT_FALSE(p.isKey("ph"));
+  TEST_ASSERT_EQUAL(11, p.getInt("pheight", -1));
   p.end();
 }
 
@@ -185,7 +198,8 @@ void esp32_backup_keeps_the_pico_wiring() {
 
 int main() {
   UNITY_BEGIN();
-  RUN_TEST(legacy_matrix_keys_are_removed);
+  RUN_TEST(legacy_panel_height_is_ignored_and_removed);
+  RUN_TEST(panel_height_uses_fresh_key);
   RUN_TEST(config_and_settings_reboot_roundtrip);
   RUN_TEST(failed_writes_keep_last_config);
   RUN_TEST(restore_and_disabled_stores);
