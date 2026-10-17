@@ -82,7 +82,8 @@ foreach(TEST_DIR IN LISTS TEST_DIRS)
       "${AWTRIX_ROOT}/src/persistence/SystemConfigApply.cpp")
     # No Linux-built core: Settings and every consumer use the Pico layout.
     target_include_directories("${TEST_NAME}" PRIVATE "${AWTRIX_ROOT}/src")
-    target_compile_options("${TEST_NAME}" PRIVATE -ffunction-sections -fdata-sections)
+    # DeviceConfig's generated overload set includes types absent from the Pico fields.
+    target_compile_options("${TEST_NAME}" PRIVATE -ffunction-sections -fdata-sections -Wno-unused-function)
     target_link_options("${TEST_NAME}" PRIVATE -Wl,--gc-sections)
     target_link_libraries("${TEST_NAME}" PRIVATE awtrix_json unity awtrix_warnings)
   else()
