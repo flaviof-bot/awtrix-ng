@@ -101,6 +101,8 @@ struct SocProfile {
   PinSet defaults;
   // The board's wiring is soldered: GPIO edits are refused, the defaults still validate.
   bool fixedWiring = false;
+  int fixedPanelWidth = 0;
+  int fixedPanelHeights[2] = {0, 0};
 };
 
 namespace detail {

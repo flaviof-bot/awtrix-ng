@@ -60,8 +60,8 @@ class PicoSystem final : public ISystemService {
   bool resetPending = false;
 };
 
-// The panel is fixed: 53x11, nothing else is admitted.
-constexpr DisplayLimits kUnicornDisplayLimits{53, 53, 11, 11, 53 * 11};
+// Eight rows is the compatibility mode; 9 and 10 are rejected by ConfigRules.
+constexpr DisplayLimits kUnicornDisplayLimits{53, 53, 8, 11, 53 * 11};
 
 IBoard* g_board = nullptr;
 sound::AudioRouter g_audio; // Null sinks honestly report MP3/radio unavailable.
@@ -77,7 +77,7 @@ std::unique_ptr<ApplicationRuntime> g_runtime;
 std::string g_capabilities; // M4b: served by the HTTP API, M5b: published over MQTT.
 
 PlatformDescriptor platformDescriptor() {
-  PlatformDescriptor platform{"rp2040", {g_board->matrixWidth(), g_board->matrixHeight(), false},
+  PlatformDescriptor platform{"rp2040", {g_board->matrixWidth(), g_board->matrixHeight(), true},
                               false};
   platform.lightSensor = true;
   platform.microphonePcm = false;
@@ -110,6 +110,10 @@ void setup() {
   if (g_storageReady) {
     g_cfg.load();
     pico::installPaletteLoader();
+  }
+  if (g_cfg.panelHeight != 8 && g_cfg.panelHeight != 11) {
+    Serial.println("warning: Galactic Unicorn panelHeight must be 8 or 11; using 11");
+    g_cfg.panelHeight = 11;
   }
   logbuf::setVerbose(g_cfg.debugMode);
   g_board = &activeBoard(g_cfg);

@@ -46,8 +46,13 @@ struct DeviceConfig : PlatformConfig {
   float ldrFactor = 1.0f, ldrGamma = 2.2f;
   bool ldrOnGround = false;
   long brightnessSmoothing = 10000;
+#if defined(AWTRIX_PLATFORM_RP2040)
+  int panelWidth = 53;
+  int panelHeight = 11;
+#else
   int panelWidth = 32;
   int panelHeight = kMatrixHeight;
+#endif
   int panels = 1;
   mutable bool persistencePending = false;
   PanelStart panelStart = PanelStart::TopLeft;

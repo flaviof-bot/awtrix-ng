@@ -284,6 +284,21 @@ inline bool validateMatrixGeometry(int panelWidth, int panels, ConfigError& err)
   return true;
 }
 
+// Built-in panels may allow discrete logical heights, not every height in their limits.
+inline bool validateFixedPanel(const pins::SocProfile& soc, int width, int panels,
+                               int height, ConfigError& err) {
+  if (!soc.fixedPanelWidth) return true;
+  if (width != soc.fixedPanelWidth || panels != 1) {
+    err = {panels != 1 ? "panels" : "panelWidth", "panel width is fixed"};
+    return false;
+  }
+  if (height != soc.fixedPanelHeights[0] && height != soc.fixedPanelHeights[1]) {
+    err = {"panelHeight", "must be 8 or 11"};
+    return false;
+  }
+  return true;
+}
+
 // bclk/lrclk/dout are the bus and go together; mclk and ampEnable are extras some DAC boards
 // need and are only meaningful once the bus itself is wired.
 inline bool validateAudioPins(int bclk, int lrclk, int dout, int mclk, int ampEnable,

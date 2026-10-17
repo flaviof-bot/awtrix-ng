@@ -11,5 +11,5 @@ DeviceConfig galacticUnicornDefaults() {
 }
 
 GalacticUnicornBoard::GalacticUnicornBoard(const DeviceConfig& cfg)
-    : height_(cfg.panelHeight >= 8 && cfg.panelHeight <= 11 ? cfg.panelHeight : 11) {}
+    : height_(cfg.panelHeight == 8 ? cfg.panelHeight : 11) {}
 }
