@@ -28,6 +28,7 @@
 #include "hal/IBoard.h"
 #include "media/AwtrixFontAdapter.h"
 #include "media/DevicePageIcon.h"
+#include "media/ScriptIcon.h"
 #include "persistence/AppOrderStore.h"
 #include "persistence/Filesystem.h"
 #include "persistence/NvsSettings.h"
@@ -163,6 +164,7 @@ MqttService g_mqtt;
 std::unique_ptr<net::IHostResolver> g_hostResolver;
 // The ESP32's script wiring less its HTTP worker (#6): script http.* and Modbus reads return false.
 ScriptMqttBridge g_scriptMqtt;
+ScriptIcon g_scriptIcon;
 ScriptStore<> g_scriptStore;
 script::ScriptServices g_scriptSvc;
 script::ScriptHost* g_scripts = nullptr;
@@ -221,17 +223,9 @@ bool holdingRescueAtBoot() {
 void beginScripts() {
   g_runtime->configureScripts(g_scriptSvc);
   g_scriptSvc.mqtt = &g_scriptMqtt;
-  g_scriptSvc.storeSink = &g_scriptStore;
-  g_scriptSvc.readSource = [](const std::string& name, std::string& out) {
-    return g_scriptStore.readSource(name, out);
-  };
-  g_scriptSvc.readStore = [](const std::string& name, std::string& out) {
-    return g_scriptStore.readStore(name, out);
-  };
-  g_scriptSvc.monotonicMs = [] { return monotonicMs(); };
-  // Script output goes through the shared log, so it reaches /api/v1/logs.
-  g_scriptSvc.log = [](const std::string& text) { logf("%s", text.c_str()); };
-  g_scriptSvc.logDebug = [](const std::string& text) { logdbg("%s", text.c_str()); };
+  // Sources, stores, icons and the shared log (print() reaches /api/v1/logs), as on the ESP32.
+  bootstrap::configureScriptFiles(g_scriptSvc, g_scriptStore, g_scriptIcon);
+  g_scriptIcon.setLog([](const std::string& s) { logf("[icons] %s", s.c_str()); });
   g_scriptSvc.freeHeap = [] { return static_cast<std::size_t>(rp2040.getFreeHeap()); };
   g_scriptSvc.maxAllocHeap = [] { return script::heap::picoLargestFreeBlock(); };
   g_mqtt.setScriptingRunning(g_cfg.scriptingEnabled);
@@ -318,6 +312,7 @@ void setup() {
                                           g_builtinApps->registry()));
   if (!g_runtime->ready()) logf("matrix: no frame memory");
   g_board->begin();
+  g_scriptIcon.setPanelSize(g_board->matrixWidth(), g_board->matrixHeight());
   g_display.setScreen(&g_runtime->canvas());
   g_runtime->markSensors(*g_board);
   g_controls.begin(g_runtime->engine(), g_cfg, &g_runtime->launcher());
@@ -381,10 +376,7 @@ void setup() {
     logbuf::setVerbose(g_cfg.debugMode);
     g_mqtt.applyHaConfig(g_cfg);
   });
-  g_http.setOnAssetsChanged([] {
-    g_runtime->invalidateIcons();
-    render::clearPaletteCache();
-  });
+  g_http.setOnAssetsChanged([] { bootstrap::assetsChanged(*g_runtime, g_scriptIcon); });
   // Before the MQTT service starts: its Home Assistant discovery is built from these.
   refreshCapabilities();
   // The ESP32's MQTT service, topics and discovery; the Pico's resolver bounds each lookup.

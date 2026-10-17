@@ -2,7 +2,8 @@
 
 namespace awtrix {
 
-// M6a (#6): script icons; no remote icon source until then.
+// Script icons come from the device only, as on the ESP32; the Linux app also takes them from a
+// remote image source (its own platform_icons/Remote.h).
 struct RemoteIconEntry {
   static void resetRemote() {}
   static constexpr int offsetX() { return 0; }
