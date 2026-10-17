@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <HTTPClient.h>
+#include <WiFiClient.h>
 
 #include <memory>
 #include <string>
@@ -13,6 +15,7 @@
 #include "core/SettingsSaver.h"
 #include "core/apps/DefaultApps.h"
 #include "core/effects/EffectNoise.h"
+#include "core/input/ButtonWebhook.h"
 #include "core/render/BootScreen.h"
 #include "core/render/PaletteStore.h"
 #include "core/render/ProvisioningScreen.h"
@@ -110,6 +113,22 @@ constexpr DisplayLimits kUnicornDisplayLimits{53, 53, 8, 11, 53 * 11};
 
 IBoard* g_board = nullptr;
 GalacticUnicornControls g_controls;
+std::string g_uid;
+
+// The buttonCallback webhook, from the loop like an ESP32's (system/PeripheryService.cpp) and with
+// the same body and 300 ms waits, so an unreachable listener only stalls the display briefly.
+void postButton(const std::string& url, int button, bool state) {
+  WiFiClient wc;
+  // arduino-pico's HTTPClient has no connect timeout; the client's own timeout bounds the connect.
+  wc.setTimeout(300);
+  HTTPClient http;
+  http.setTimeout(300);
+  if (!http.begin(wc, url.c_str())) return;
+  http.addHeader("Content-Type", "application/json");
+  const std::string body = input::webhookPressBody(input::kWebhookButtonNames[button], state, g_uid);
+  http.POST(reinterpret_cast<uint8_t*>(const_cast<char*>(body.data())), body.size());
+  http.end();
+}
 sound::AudioRouter g_audio; // Null sinks honestly report MP3/radio unavailable.
 ScreenDisplay g_display;
 PicoSystem g_system;
@@ -250,6 +269,8 @@ void setup() {
   String mac = WiFi.macAddress();
   mac.replace(":", "");
   mac.toLowerCase();
+  g_uid = mac.c_str();
+  g_controls.setButtonPost(postButton);
   const uint16_t webPort =
       g_net.apMode() ? 80 : (g_cfg.webPort > 0 ? static_cast<uint16_t>(g_cfg.webPort) : 80);
   // In AP mode the server admits only the provisioning routes (core/ProvisioningPolicy.h).

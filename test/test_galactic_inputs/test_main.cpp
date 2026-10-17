@@ -1,4 +1,6 @@
 #include <unity.h>
+#include <string>
+#include <vector>
 #include "../EngineFakes.h"
 #include "system/GalacticUnicornControls.h"
 #include "core/launcher/Launcher.h"
@@ -115,9 +117,26 @@ void ac_step_in_launcher() {
   TEST_ASSERT_EQUAL(0,f.menu.selected()); f.press(2); TEST_ASSERT_EQUAL(1,f.menu.selected());
   f.press(0); TEST_ASSERT_EQUAL(0,f.menu.selected());
 }
+std::vector<std::string> g_posted;
+void recordPost(const std::string& url, int button, bool pressed) {
+  g_posted.push_back(url + " " + std::to_string(button) + (pressed ? " down" : " up"));
+}
+void abc_call_the_button_webhook() {
+  g_posted.clear();
+  Fixture f; f.controls.setButtonPost(recordPost);
+  f.down(0); f.up(0); TEST_ASSERT_EQUAL(0, g_posted.size()); // off while buttonCallback is empty
+  f.cfg.buttonCallback = "http://hook";
+  f.down(0); f.up(0); f.down(2); f.up(2); f.down(4); f.up(4);
+  TEST_ASSERT_EQUAL(4, g_posted.size()); // brightness and the other extras never call it
+  TEST_ASSERT_EQUAL_STRING("http://hook 0 down", g_posted[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("http://hook 0 up", g_posted[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("http://hook 2 down", g_posted[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("http://hook 2 up", g_posted[3].c_str());
+}
 int main() {
   UNITY_BEGIN(); RUN_TEST(debounce_press_hold_bounce); RUN_TEST(map_and_clamp);
   RUN_TEST(extras_use_dispatcher_events); RUN_TEST(navigation_events_and_light);
   RUN_TEST(navigation_matches_commands_and_select_double_press);
+  RUN_TEST(abc_call_the_button_webhook);
   RUN_TEST(b_hold_opens_launcher); RUN_TEST(ac_step_in_launcher); return UNITY_END();
 }

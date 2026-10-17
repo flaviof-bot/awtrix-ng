@@ -5,6 +5,8 @@
 #include "core/sensing/AutoBrightness.h"
 #include "core/sensing/MedianFilter.h"
 
+#include <string>
+
 namespace awtrix {
 // Board-only adapter. Navigation/menu and button events remain shared with ESP32.
 class GalacticUnicornControls {
@@ -38,8 +40,15 @@ class GalacticUnicornControls {
       }
       engine.execute(c);
     }
-    input_.setState({buttons_[0].pressed(), buttons_[1].pressed(), buttons_[2].pressed()}, nowMs);
+    input_.setState({buttons_[0].pressed(), buttons_[1].pressed(), buttons_[2].pressed()}, nowMs,
+                    [this](int button, bool pressed) {
+                      const std::string& url = input_.config().buttonCallback;
+                      if (post_ && !url.empty()) post_(url, button, pressed);
+                    });
   }
+  // The buttonCallback webhook: A, B and C report every press and release, as on an ESP32.
+  using ButtonPost = void (*)(const std::string& url, int button, bool pressed);
+  void setButtonPost(ButtonPost post) { post_ = post; }
   // Same median and light-curve input as ESP32 PeripheryService, sampled at 100 ms.
   void sampleLight(CoreEngine& engine, int raw, int64_t nowMs) {
     if (nowMs - lastLdrMs_ < 100) return;
@@ -54,5 +63,6 @@ class GalacticUnicornControls {
   std::array<galactic::DebouncedButton, 9> buttons_{};
   MedianFilter<uint16_t, 5> ldrFilter_;
   int64_t lastLdrMs_ = -100000;
+  ButtonPost post_ = nullptr;
 };
 }

@@ -53,7 +53,7 @@ All nine keys are active low and debounced for 35 ms. B held for 500 ms opens
 the shared launcher; A/C step in it. Rotation and swapButtons follow ButtonRouter.
 D remains unmapped. Sleep, brightness and volume use the engine command path.
 Volume steps the master `volume` (0-100 %), which AudioRouter applies to every group, tones included; speaker wiring
-comes in M5b. The webhook and A+C boot rescue are separate milestones.
+comes in M5b. The A+C boot rescue is a separate milestone.
 
 | Input | GPIO | Function |
 |---|---|---|
@@ -63,6 +63,10 @@ comes in M5b. The webhook and A+C boot rescue are separate milestones.
 | Volume up / down | 7 / 8 | NG volume |
 | Brightness up / down | 21 / 26 | NG brightness |
 | Light sensor | 28 (ADC2) | Automatic brightness |
+
+A, B and C also call the [`buttonCallback`](../reference/system.md) webhook on every press and
+release, with the same body as an ESP32 (`left`, `middle`, `right`). Connecting and waiting for
+the answer are each capped at 300 ms, so an unreachable listener only stalls the display briefly.
 
 ## Wi-Fi and setup
 
