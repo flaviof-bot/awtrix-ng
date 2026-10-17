@@ -13,6 +13,8 @@
 #include "hal/GalacticUnicornBoard.h"
 #include "hal/IBoard.h"
 #include "media/AwtrixFontAdapter.h"
+#include "platform/BuildFeatures.h"
+#include "platform/rp2040/Rp2040Profile.h"
 #include "system/MonotonicClock.h"
 
 // Feature macros describe this build, not a claim that a runtime service exists.
@@ -60,6 +62,8 @@ PlatformDescriptor platformDescriptor() {
                               false};
   platform.lightSensor = true;
   platform.microphonePcm = false;
+  platform.features = buildcfg::buildFeatures();
+  platform.fixedGpio = &pins::rp2040Profile();
   platform.display.limits = kUnicornDisplayLimits;
   platform.display.ready = g_board->displayReady() && g_runtime->ready();
   return platform;

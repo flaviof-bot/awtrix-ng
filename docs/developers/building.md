@@ -314,10 +314,12 @@ PlatformIO installed through `pip`, plus Node.js for the firmware builds and the
 | Web UI tests (jsdom) | `npm test` in `webui/test`, then `node --test` for the flow converter | The web UI logic loaded from the shipped `webui/index.html`, `tools/flowconv` |
 | TC002 image tools | Reusable `tc002-image-tools.yml` | The pinned WASM tools and browser/desktop installer tests; CI, Docs and installer packaging reuse the verified cache for identical inputs |
 | Firmware build | `pio run -e <env>`, then `scripts/factory_image.py --all` | `awtrix`, `awtrix_s3_octal`, `awtrix_s3_quad`, and a USB install image per flash size |
+| Pico firmware build | `pio run -e <env>` | `galactic_unicorn`, `galactic_unicorn_2w`; uploads `uf2-<env>` with the `firmware.uf2` |
 | API docs match the firmware | `tools/check_docs_sync.py`, `check_flow_converter.py`, `gen_agent_skill.py --check`, `check_berry_api.py`, `check_prelude_solidified.py`, `check_font_sync.py`, `check_partitions.py` | Documented fields and error codes, the flow converter's maps, the downloadable agent skill, the editor's Berry table, the solidified prelude, the generated panel fonts, every partition table |
 
 On a `v*` tag a release job also publishes every ESP32 update image, the USB install images for
-each supported flash size, the TC002 update package, the TC002 USB installation package with its
+each supported flash size, the Galactic Unicorn UF2s (`firmware-galactic-unicorn.uf2`,
+`firmware-galactic-unicorn-2w.uf2`), the TC002 update package, the TC002 USB installation package with its
 corresponding sources, the TC002 desktop installers and the license notices. The tag must match
 `version`, and `docs/releases/<version>.md` must exist: the release body only links that page in
 each clock's documentation. The job depends on the native, web UI, TC002 image tools, TC002 update

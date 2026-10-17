@@ -64,6 +64,11 @@ mkdocs_build() {
     rm -f "$log"
     return "$rc"
 }
+# A Pico installs and updates from its UF2 only, so a build without one has failed.
+pico_build() {
+    pio run -e "$1" && test -s ".pio/build/$1/firmware.uf2" &&
+        printf 'UF2 %s (%d bytes)\n' ".pio/build/$1/firmware.uf2" "$(stat -c %s ".pio/build/$1/firmware.uf2")"
+}
 tag_check() {
     local version
     version=$(tr -d '[:space:]' < version)
@@ -118,6 +123,7 @@ for step in "${steps[@]}"; do
             # its generated sources, licenses and build manifest.
             run_step docs-image-tools python tools/tc002/browser-image/build.py --work .pio/docs-image-tools --output docs/assets/tc002/image
             run_step mkdocs mkdocs_build ;;
+        build:galactic_unicorn*) run_step "$step" pico_build "${step#build:}" ;;
         build:*) run_step "$step" pio run -e "${step#build:}" ;;
     esac
 done

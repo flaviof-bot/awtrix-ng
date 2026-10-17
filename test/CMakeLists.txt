@@ -112,6 +112,31 @@ if(WIN32)
 endif()
 add_test(NAME test_settings_esp32 COMMAND test_settings_esp32)
 
+# The Galactic Unicorn's settings shim: fixed panel and GPIO (R23, R24).
+add_executable(test_settings_rp2040
+  platform_settings/rp2040.cpp
+  "${AWTRIX_ROOT}/src/platform/rp2040/settings/Config.cpp"
+  "${AWTRIX_ROOT}/src/platform/rp2040/SocProfileRp2040.cpp"
+  "${AWTRIX_ROOT}/src/core/render/ColorGrade.cpp"
+  "${AWTRIX_ROOT}/src/persistence/DeviceConfigJson.cpp"
+  "${AWTRIX_ROOT}/src/persistence/SystemConfigApply.cpp"
+  "${AWTRIX_ROOT}/src/core/mqtt/HaDiscovery.cpp"
+  "${AWTRIX_ROOT}/src/core/Settings.cpp"
+  "${AWTRIX_ROOT}/src/core/JsonColor.cpp"
+  "${AWTRIX_ROOT}/src/core/WeekdayBarConfig.cpp"
+  "${AWTRIX_ROOT}/src/core/payload/ScrollSpec.cpp"
+  "${AWTRIX_ROOT}/src/core/render/Color.cpp"
+  "${AWTRIX_ROOT}/src/core/apps/BuiltinAppConfig.cpp"
+)
+target_include_directories(test_settings_rp2040 PRIVATE
+  "${AWTRIX_ROOT}/src/platform/rp2040/include" "${AWTRIX_ROOT}/src")
+target_compile_definitions(test_settings_rp2040 PRIVATE AWTRIX_PLATFORM_RP2040)
+target_link_libraries(test_settings_rp2040 PRIVATE awtrix_json unity awtrix_warnings)
+if(WIN32)
+  target_link_options(test_settings_rp2040 PRIVATE -static-libstdc++ -static-libgcc)
+endif()
+add_test(NAME test_settings_rp2040 COMMAND test_settings_rp2040)
+
 add_test(NAME test_font_compact_tables
   COMMAND "${CMAKE_COMMAND}" "-DNM=${CMAKE_NM}" "-DBINARY=$<TARGET_FILE:test_font_compact>"
           -P "${CMAKE_CURRENT_LIST_DIR}/check_compact_fonts.cmake")

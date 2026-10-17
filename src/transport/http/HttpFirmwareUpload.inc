@@ -24,6 +24,7 @@ void HttpApiServer::scanImageMarker(const uint8_t* buf, size_t len) {
 }
 
 void HttpApiServer::handleUpdateUpload() {
+  if constexpr (!buildcfg::buildFeatures().browserOta) return;
   HTTPUpload& up = server_->upload();
   if (up.status == UPLOAD_FILE_START) {
     if (!updateRequest_.start(multipartPolicy())) return;
@@ -102,6 +103,10 @@ void HttpApiServer::handleUpdateUpload() {
 }
 
 void HttpApiServer::handleUpdateDone() {
+  if constexpr (!buildcfg::buildFeatures().browserOta) {
+    sendResult(api::httpResponse({}, DispatchResult::Unavailable, {}));
+    return;
+  }
   addCorsHeaders("POST", server_->uri().c_str());
   // Authenticate this completed request even if no upload callback ran at all.
   const auto result = updateRequest_.complete(multipartPolicy(),

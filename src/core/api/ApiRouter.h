@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "core/Command.h"
+#include "core/FeatureSet.h"
 
 namespace awtrix {
 class CoreEngine;
@@ -24,7 +25,8 @@ enum class RouteOutcome : uint8_t {
 };
 
 RouteOutcome routeHttp(const std::string& method, const std::string& path,
-                       std::string&& body, Command& cmd, HttpResult& immediate);
+                       std::string&& body, Command& cmd, HttpResult& immediate,
+                       const FeatureSet& features = {});
 
 inline constexpr const char* kMethodOverrideHeader = "X-HTTP-Method-Override";
 
@@ -51,9 +53,12 @@ bool isRawBodyWrite(const std::string& method, const std::string& path);
 bool acceptsBodyContentType(const std::string& method, const std::string& path,
                             const std::string& contentType);
 
-// Moves payload into cmd only when it returns Routed.
+// Moves payload into cmd only when it returns Routed. A feature the build left out answers 503
+// unavailable: a route of its own before the body is looked at, a payload that picks it after
+// the bounded parse and before anything runs.
 RouteOutcome routeMqtt(const std::string& suffix, std::string& payload, Command& cmd,
-                       std::string& resultPayload);
+                       std::string& resultPayload,
+                       const FeatureSet& features = {});
 
 bool isResultEcho(const std::string& suffix);
 

@@ -50,8 +50,12 @@ inline std::string capabilitiesJson(const std::vector<std::string>& effects,
     writer.member(DeviceCapabilities::kNames[i].data() + kAudioPrefix, caps.present[i]);
   }
   writer.member("clip", audio.clip).endObject();
-  writer.member("microphone", caps.has("microphone")).member("scriptUpdates", true).key("gpio");
-  if (platform && !platform->configurableGpio) writer.null();
+  const FeatureSet features = platform ? platform->features : FeatureSet{};
+  writer.member("microphone", caps.has("microphone")).member("scriptUpdates", features.scripting)
+      .member("scripting", features.scripting).key("gpio");
+  if (platform && !platform->configurableGpio && platform->fixedGpio)
+    writer.raw(pins::toJson(*platform->fixedGpio));
+  else if (platform && !platform->configurableGpio) writer.null();
   else writer.raw(pins::toJson(pins::activeProfile()));
   if (platform) {
     const auto& display = platform->display;

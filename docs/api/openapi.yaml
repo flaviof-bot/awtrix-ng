@@ -2080,6 +2080,7 @@ paths:
                     properties:
                       id: {type: string, description: 'Platform identity.'}
                   scriptUpdates: {type: boolean, description: The compare-and-update script route is available.}
+                  scripting: {type: boolean, description: "This firmware has scripting. Without it every script route answers 503 unavailable before any body is read."}
                   ble: {x-only: [tc002], type: boolean, enum: [true], description: "Present only where scripts can import ble. Radio health is reported by ble.state()."}
                   gamepad: {x-only: [tc002], type: boolean, enum: [true], description: "Present only while scripts can import gamepad, which needs scripting on. /api/v1/gamepad exists. A Bluetooth gamepad can be paired where ble is true as well."}
                   gamepadRemote: {x-only: [tc002], type: boolean, enum: [true], description: "Present only while a phone can be a gamepad, which needs scripting on. POST /api/v1/gamepad/remote exists."}
@@ -2911,7 +2912,9 @@ components:
     Unavailable:
       description: >
         The feature is not present on this build or this hardware. Unlike a 500
-        nothing went wrong, and unlike serviceBusy retrying will not help.
+        nothing went wrong, and unlike serviceBusy retrying will not help. A route
+        that exists only for a feature the build leaves out answers this before any
+        body is read; a shared audio route answers it after parsing the sound.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -2921,6 +2924,9 @@ components:
       type: object
       description: The chip's pin rules, so a client can check pin changes before sending them.
       properties:
+        fixed:
+          type: boolean
+          description: True only on a board whose wiring is soldered; it refuses every pin change. False on the ESP32 chips.
         soc:
           type: string
           allOf:

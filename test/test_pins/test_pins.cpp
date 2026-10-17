@@ -339,6 +339,16 @@ void test_s3_rejects_classic_matrix_pins_it_cannot_drive() {
 void setUp() {}
 void tearDown() {}
 
+// Only a board with soldered wiring refuses pin edits; the ESP32 chips keep validating each pin.
+void test_esp32_wiring_is_not_fixed() {
+  TEST_ASSERT_FALSE(pins::esp32Profile().fixedWiring);
+  TEST_ASSERT_FALSE(pins::esp32s3Profile().fixedWiring);
+  auto moved = pins::esp32Profile().defaults;
+  moved.buzzer = 4;
+  std::string err;
+  TEST_ASSERT_TRUE(pins::validate(moved, pins::esp32Profile(), err));
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_profile_defaults_are_valid);
@@ -374,6 +384,7 @@ int main(int, char**) {
   RUN_TEST(test_positional_init_did_not_shift_the_other_pins);
   RUN_TEST(test_i2s_pins_are_validated_like_any_other_output);
   RUN_TEST(test_i2s_pins_may_be_disabled_together);
+  RUN_TEST(test_esp32_wiring_is_not_fixed);
   UNITY_END();
   return 0;
 }

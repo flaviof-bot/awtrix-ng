@@ -65,6 +65,8 @@ python scripts/test_native.py          # host unit tests
 pio run -e awtrix                      # ESP32 firmware images
 pio run -e awtrix_s3_octal
 pio run -e awtrix_s3_quad
+pio run -e galactic_unicorn             # Galactic Unicorn UF2s (Pico W, Pico 2 W)
+pio run -e galactic_unicorn_2w
 python tools/check_docs_sync.py        # docs match the firmware's real fields
 python tools/check_berry_api.py        # editor's Berry API table is current
 python tools/gen_agent_skill.py --check

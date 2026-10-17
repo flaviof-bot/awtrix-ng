@@ -188,6 +188,16 @@ Routes that change something answer when the change is done:
 | Busy | 503 | `serviceBusy`, message `busy, try again` (with `Retry-After: 2`) |
 | Failed / unknown | 500 | `internalError`, message `command failed` |
 
+A firmware build can leave out optional features: scripting, MP3 files, radio, HTTPS streams and
+browser firmware updates. Every ESP32 build has them all. Where a build leaves one out, a route or
+MQTT command that exists only for that feature (`/api/v1/scripts/...`, `/api/v1/apps/script/...`,
+`/api/v1/apps/script-update/...`, a script's `/config` and `/data`, `/api/v1/audio/mp3`,
+`/api/v1/audio/stations`, `cmd/audio/stations`, `/update`) answers `503 unavailable` before any
+body is read. `/api/v1/audio/play` and `cmd/audio/play` are shared: a sound that needs the missing
+feature (a file, a station, an `https://` address) answers `503 unavailable` once the body is
+parsed, before anything plays, while the other sounds keep working.
+[`scripting`](#get-apiv1capabilities) in capabilities and the `audio` flags say what this build has.
+
 The one exception is `PATCH /api/v1/settings`: on success it returns **all settings** instead of
 `{"ok":true}`.
 
@@ -2529,6 +2539,7 @@ sensors<!-- /only -->. Read the names here instead of writing them into your cod
 | `gpio` | - | always `null`: the pins of this clock are fixed |
 <!-- /only -->
 | `scriptUpdates` | - | always `true`: [script updates](#script-updates) are supported |
+| `scripting` | - | `true` when this firmware has scripting. Without it every script route answers `503 unavailable` |
 
 `effects` and `overlays` are sorted alphabetically. `transitions` has its own fixed order. All
 effect, overlay, palette and transition names accept any upper/lower case: `"matrix"`, `"Matrix"`
@@ -2671,6 +2682,7 @@ Read the rules here instead of keeping your own table.
 | Key | Meaning |
 |---|---|
 | `soc`, `label` | chip id and display name. `soc` is the same as in the device state |
+| `fixed` | `false`: every pin is yours to set. `true` only on a board whose wiring is soldered, which refuses pin changes |
 | `max` | highest GPIO number |
 | `missing` | ranges (both ends included) inside `0…max` that do not exist on this chip: refused |
 | `inputOnly` | pins that cannot drive an output, so they are refused for the display, buttons, buzzer, I²C and DFPlayer TX<!-- only esp32-s3 -->. Empty on this chip<!-- /only --> |

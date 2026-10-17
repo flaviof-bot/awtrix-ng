@@ -82,6 +82,14 @@ void HttpApiServer::dispatch() {
     sendResult(api::forbiddenOrigin());
     return;
   }
+  // A feature this build left out answers before its body is collected.
+  if constexpr (!buildcfg::buildFeatures().all()) {
+    if (api::featurePolicy(buildcfg::buildFeatures(), req.path) == DispatchResult::Unavailable) {
+      dropRawBody();
+      sendResult(api::httpResponse({}, DispatchResult::Unavailable, {}));
+      return;
+    }
+  }
   if (takeBody(req)) return;
   if (rejectedByPolicy(req)) return;
 
@@ -221,7 +229,8 @@ bool HttpApiServer::serveWebUi(const Request& req) {
 bool HttpApiServer::serveCommand(Request& req) {
   Command cmd;
   api::HttpResult immediate;
-  switch (api::routeHttp(req.method, req.path, std::move(req.body), cmd, immediate)) {
+  switch (api::routeHttp(req.method, req.path, std::move(req.body), cmd, immediate,
+                         buildcfg::buildFeatures())) {
     case api::RouteOutcome::Respond:
       probe::report("req:route", 128);
       probe::begin();

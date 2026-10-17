@@ -142,6 +142,39 @@ jobs:
           path: dist/usb-*.bin
           if-no-files-found: error
 
+  pico-build:
+    name: Pico firmware build (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [galactic_unicorn, galactic_unicorn_2w]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Cache PlatformIO
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+      - name: Install PlatformIO
+        run: pip install -U platformio
+      - name: Build firmware
+        run: pio run -e ${{ matrix.env }}
+      - uses: actions/upload-artifact@v4
+        with:
+          # A Pico has no OTA and no factory image: the UF2 is its only install file.
+          name: uf2-${{ matrix.env }}
+          path: .pio/build/${{ matrix.env }}/firmware.uf2
+          if-no-files-found: error
+
   docs:
     name: API docs match the firmware
     runs-on: ubuntu-latest
@@ -216,7 +249,7 @@ jobs:
   release:
     name: Publish firmware release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [native-tests, webui-tests, tc002-image-tools, tc002-update, tc002-installer, device-build, docs]
+    needs: [native-tests, webui-tests, tc002-image-tools, tc002-update, tc002-installer, device-build, pico-build, docs]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -262,6 +295,17 @@ jobs:
         # images stay separate assets on purpose: the device names the exact
         # file to upload, and that name should be a direct click.
         run: zip usb-awtrix-ng.zip usb-awtrix-ng-*.bin
+      - name: Fetch the Galactic Unicorn images
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: uf2-*
+          path: uf2
+      - name: Stage the Galactic Unicorn images
+        # A Pico has no OTA: the UF2 dropped on its BOOTSEL drive is both the first install and
+        # every update, so each Pico gets exactly one file, the one pico-build tested.
+        run: |
+          cp uf2/uf2-galactic_unicorn/firmware.uf2 firmware-galactic-unicorn.uf2
+          cp uf2/uf2-galactic_unicorn_2w/firmware.uf2 firmware-galactic-unicorn-2w.uf2
       - name: Fetch the TC002 update package, USB installation package and sources
         uses: actions/download-artifact@v8.0.1
         with:
@@ -305,6 +349,8 @@ jobs:
             firmware-awtrix-ng.bin
             firmware-awtrix-ng-s3-octal.bin
             firmware-awtrix-ng-s3-quad.bin
+            firmware-galactic-unicorn.uf2
+            firmware-galactic-unicorn-2w.uf2
             awtrix-ng-tc002.awup
             usb-awtrix-ng.zip
             usb-awtrix-ng-tc002.zip

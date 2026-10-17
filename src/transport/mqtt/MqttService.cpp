@@ -4,6 +4,7 @@
 
 #include "core/CoreEngine.h"
 #include "core/api/ApiRouter.h"
+#include "platform/BuildFeatures.h"
 #include "core/api/StateJson.h"
 #include "hal/IBoard.h"
 #include "system/Log.h"
@@ -145,7 +146,7 @@ void MqttService::handleMessage(char* topic, uint8_t* payload, unsigned int len)
   engine_->state().runtime().receivedMessages++;
   Command cmd;
   std::string result;
-  switch (api::routeMqtt(suffix, body, cmd, result)) {
+  switch (api::routeMqtt(suffix, body, cmd, result, buildcfg::buildFeatures())) {
     case api::RouteOutcome::Routed: {
       const DispatchResult r = engine_->execute(cmd);
       logdbg("mqtt cmd %s -> %d", suffix.c_str(), static_cast<int>(r));

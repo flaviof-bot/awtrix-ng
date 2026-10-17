@@ -54,6 +54,10 @@ api::HttpResult HttpApiServer::multipartPolicy() {
 }
 
 void HttpApiServer::handleFileUpload() {
+  if constexpr (!buildcfg::buildFeatures().all()) {
+    if (api::featurePolicy(buildcfg::buildFeatures(), server_->uri().c_str()) ==
+        DispatchResult::Unavailable) return;
+  }
   HTTPUpload& upload = server_->upload();
   if (upload.status == UPLOAD_FILE_START) {
     const api::HttpResult policy = multipartPolicy();
@@ -76,6 +80,13 @@ void HttpApiServer::handleFileUpload() {
 }
 
 void HttpApiServer::handleFileUploadDone() {
+  if constexpr (!buildcfg::buildFeatures().all()) {
+    if (api::featurePolicy(buildcfg::buildFeatures(), server_->uri().c_str()) ==
+        DispatchResult::Unavailable) {
+      sendResult(api::httpResponse({}, DispatchResult::Unavailable, {}));
+      return;
+    }
+  }
   addCorsHeaders("POST", server_->uri().c_str());
   const auto policy = multipartPolicy();
   fileUpload_.authorize(policy);
