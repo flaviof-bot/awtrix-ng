@@ -39,12 +39,14 @@ pip install -U platformio
 Node 22+ is needed for a firmware build (the web UI is minified through `npx`
 before it is embedded) and for the web UI tests.
 
-## ESP32 firmware and host tests
+## Firmware and host tests
 
 ```bash
 pio run  -e awtrix        # ESP32 firmware (stock pin defaults)
 pio run  -e awtrix_s3_octal     # ESP32-S3 firmware, octal PSRAM
 pio run  -e awtrix_s3_quad      # ESP32-S3 firmware, quad PSRAM
+pio run  -e galactic_unicorn    # Galactic Unicorn firmware, Pico W
+pio run  -e galactic_unicorn_2w # Galactic Unicorn firmware, Pico 2 W
 python scripts/test_native.py  # host unit tests for the portable core
 ```
 
@@ -96,7 +98,8 @@ and the pinned documentation requirements. Rebuild it when requirements change.
 
 The runner validates every argument before starting and reports PASS/FAIL for
 all steps, continuing after failures. Run groups separately with `native`,
-`linux`, `webui`, `docs`, `mkdocs` (the per-clock site build), or `build ENV...`.
+`linux`, `webui`, `docs`, `mkdocs` (the per-clock site build), or `build ENV...`;
+`all` builds the three ESP32 environments and both Galactic Unicorn environments.
 The actual systemd service test is explicitly skipped in this container and
 remains a GitHub CI gate. Tag checks run only with a `refs/tags/v*` GITHUB_REF
 and matching GITHUB_REF_NAME. Release publishing and TC002 image/installer
