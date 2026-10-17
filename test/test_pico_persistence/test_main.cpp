@@ -7,7 +7,9 @@
 #include "persistence/RadioStore.h"
 #include "persistence/NvsSettings.h"
 #include "core/Settings.h"
+#include "persistence/SystemConfigApply.h"
 #include "platform/rp2040/PicoRestoreSink.h"
+#include "platform/rp2040/Rp2040Profile.h"
 
 // The production DeviceConfig, NvsSettings, LittleFS adapter and restore sink of the Pico, run
 // against the simulated filesystem in compat/.
@@ -191,6 +193,69 @@ void esp32_backup_keeps_the_pico_wiring() {
   TEST_ASSERT_TRUE(rebooted.validatePins(pinErr));
 }
 
+// A Galactic Unicorn refuses panel edits it cannot draw, and a restore keeps its own pins and panel
+// while taking the rest of a backup made on a board wired differently.
+void fixed_board_system_config() {
+  const auto& soc = pins::rp2040Profile();
+  DeviceConfig cfg;
+  cfg.setPinSet(soc.defaults);
+  cfg.panelWidth = 53; cfg.panelHeight = 11;
+  int applied = 0; sysconfig::ApplyError err;
+  auto put = [&](const char* json, sysconfig::Origin origin = sysconfig::Origin::Interactive) {
+    err = {};
+    return sysconfig::apply(cfg, api::JsonReader(json), applied, err, origin);
+  };
+  TEST_ASSERT_FALSE(put(R"({"panelWidth":64})"));
+  TEST_ASSERT_EQUAL(422, err.status); TEST_ASSERT_EQUAL_STRING("panelWidth", err.field.c_str());
+  TEST_ASSERT_FALSE(put(R"({"panelHeight":14})"));
+  TEST_ASSERT_EQUAL_STRING("panelHeight", err.field.c_str());
+  TEST_ASSERT_FALSE(put(R"({"panelWiring":"columns"})"));
+  TEST_ASSERT_EQUAL_STRING("panelWiring", err.field.c_str());
+  TEST_ASSERT_EQUAL(53, cfg.panelWidth); TEST_ASSERT_EQUAL(11, cfg.panelHeight);
+  TEST_ASSERT_TRUE(put(R"({"panelHeight":8,"mirror":true})"));
+  TEST_ASSERT_EQUAL(8, cfg.panelHeight); TEST_ASSERT_TRUE(cfg.mirror);
+  // An ESP32 backup: its own pins, width and wiring, and a height this panel cannot show.
+  TEST_ASSERT_TRUE(put(R"({"hostname":"from-esp32","panelWidth":32,"panelHeight":16,)"
+                       R"("panelWiring":"columns","pinMatrix":32,"pinBtnLeft":26,"pinLdr":45})",
+                       sysconfig::Origin::Restore));
+  TEST_ASSERT_EQUAL_STRING("from-esp32", cfg.hostname.c_str());
+  TEST_ASSERT_EQUAL(53, cfg.panelWidth); TEST_ASSERT_EQUAL(8, cfg.panelHeight);
+  TEST_ASSERT_TRUE(cfg.panelWiring == Wiring::Rows);
+  TEST_ASSERT_EQUAL(-1, cfg.pinMatrix); TEST_ASSERT_EQUAL(0, cfg.pinBtnLeft);
+  TEST_ASSERT_EQUAL(28, cfg.pinLdr);
+  // Edited by hand, a pin past this chip's GPIOs is still out of range.
+  TEST_ASSERT_FALSE(put(R"({"pinLdr":35})"));
+  TEST_ASSERT_EQUAL_STRING("pinLdr", err.field.c_str());
+  // PR 2 (M3b): a restore keeps the board's panel, so a valid height in a backup is not taken.
+  TEST_ASSERT_TRUE(put(R"({"panelHeight":11})", sysconfig::Origin::Restore));
+  TEST_ASSERT_EQUAL(8, cfg.panelHeight);
+}
+void fixed_board_adopted_at_boot() {
+  const auto& soc = pins::rp2040Profile();
+  // What an earlier build may have stored: another pin map (I2C on 4/5) and panel size.
+  DeviceConfig cfg;
+  cfg.setPinSet(pins::esp32Profile().defaults);
+  cfg.pinI2cSda = 4; cfg.pinI2cScl = 5;
+  cfg.panelWidth = 64; cfg.panels = 2; cfg.panelHeight = 16;
+  int applied = 0; sysconfig::ApplyError err;
+  TEST_ASSERT_FALSE(sysconfig::apply(cfg, api::JsonReader(R"({"debugMode":true})"), applied, err));
+  sysconfig::adoptFixedBoard(cfg, soc);
+  TEST_ASSERT_EQUAL(-1, cfg.pinI2cSda); TEST_ASSERT_EQUAL(-1, cfg.pinI2cScl);
+  TEST_ASSERT_EQUAL(28, cfg.pinLdr); TEST_ASSERT_EQUAL(-1, cfg.pinBuzzer);
+  TEST_ASSERT_EQUAL(53, cfg.panelWidth); TEST_ASSERT_EQUAL(1, cfg.panels);
+  TEST_ASSERT_EQUAL(11, cfg.panelHeight);
+  TEST_ASSERT_TRUE(sysconfig::apply(cfg, api::JsonReader(R"({"debugMode":true})"), applied, err));
+  cfg.panelHeight = 8;
+  sysconfig::adoptFixedBoard(cfg, soc);
+  TEST_ASSERT_EQUAL(8, cfg.panelHeight);
+  // A board whose pins and panel are the user's is left alone.
+  DeviceConfig esp;
+  esp.pinI2cSda = 17; esp.panelWidth = 64; esp.panelHeight = 16;
+  sysconfig::adoptFixedBoard(esp, pins::esp32Profile());
+  TEST_ASSERT_EQUAL(17, esp.pinI2cSda); TEST_ASSERT_EQUAL(64, esp.panelWidth);
+  TEST_ASSERT_EQUAL(16, esp.panelHeight);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(legacy_panel_height_is_ignored_and_removed);
@@ -200,5 +265,7 @@ int main() {
   RUN_TEST(restore_and_disabled_stores);
   RUN_TEST(restore_creates_nested_asset_directories);
   RUN_TEST(esp32_backup_keeps_the_pico_wiring);
+  RUN_TEST(fixed_board_system_config);
+  RUN_TEST(fixed_board_adopted_at_boot);
   return UNITY_END();
 }

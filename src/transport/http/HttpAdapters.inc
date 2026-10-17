@@ -1,7 +1,13 @@
 class RawWebServer : public WebServer {
  public:
   using WebServer::WebServer;
+#if defined(AWTRIX_PLATFORM_RP2040)
+  void setRawReadTimeout(unsigned long ms) {
+    if (_currentClient) _currentClient->Stream::setTimeout(ms);
+  }
+#else
   void setRawReadTimeout(unsigned long ms) { _currentClient.Stream::setTimeout(ms); }
+#endif
 
   // WebServer::send() for a std::string body.
   void sendBody(int status, const char* contentType, const std::string& body) {
@@ -11,6 +17,7 @@ class RawWebServer : public WebServer {
     if (!body.empty()) sendContent(body.data(), body.size());
   }
 
+#if !defined(AWTRIX_PLATFORM_RP2040)
   // WebServer serves one client at a time. Browsers like to open a socket and send nothing, which
   // would stall every other request, so drop a silent client as soon as someone else is waiting.
   void handleClient() override {
@@ -20,7 +27,44 @@ class RawWebServer : public WebServer {
     }
     WebServer::handleClient();
   }
+#endif
 };
+
+#if defined(AWTRIX_PLATFORM_RP2040)
+// arduino-pico's lwIP has five TCP pcbs, and ClientContext drops every accepted connection to
+// TCP_PRIO_MIN while the listener stays at TCP_PRIO_NORMAL. A SYN that finds the pool full then
+// makes lwIP abort the oldest accepted connection to make room, so a browser opening eight sockets
+// at once saw two or three of them reset mid-request. At its clients' priority the listener can no
+// longer evict them: the extra SYN is dropped, and the client's retransmit gets in once a request
+// has been answered.
+struct ListenPcb : WiFiServer {
+  static tcp_pcb* of(WiFiServer& server) { return server.*(&ListenPcb::_listen_pcb); }
+};
+
+// lwIP reports that dropped SYN as accept(NULL, ERR_MEM), and WiFiServer would wrap the NULL pcb in
+// a client and fault. Only real connections reach it.
+tcp_accept_fn serverAccept = nullptr;
+err_t acceptConnected(void* arg, tcp_pcb* pcb, err_t err) {
+  if (pcb == nullptr || err != ERR_OK) return ERR_MEM;
+  return serverAccept(arg, pcb, err);
+}
+
+// The free heap a request body may be copied into. newlib cannot report the largest free block,
+// so the total stands in for it.
+std::size_t bodyCopyRoom() { return rp2040.getFreeHeap(); }
+
+// The last path element: arduino-pico's File::name() is the leaf on some versions, the path on
+// others.
+std::string leafName(const char* name) {
+  const std::string path = name ? name : "";
+  return path.substr(path.find_last_of('/') + 1);
+}
+
+bool isFile(const std::string& path) {
+  File file = LittleFS.open(path.c_str(), "r");
+  return file && !file.isDirectory();
+}
+#endif
 
 const char* methodName(HTTPMethod m) {
   switch (m) {
@@ -35,6 +79,43 @@ const char* methodName(HTTPMethod m) {
   }
 }
 
+#if defined(AWTRIX_PLATFORM_RP2040)
+// arduino-pico has no VFS, so directories are walked with the LittleFS File API.
+bool folderEmpty(const std::string& dir) {
+  File folder = LittleFS.open(dir.c_str(), "r");
+  if (!folder || !folder.isDirectory()) return false;
+  File entry = folder.openNextFile();
+  return !entry;
+}
+
+// SHA-256 of a file in 256-byte reads through BearSSL, which arduino-pico ships; size is what was
+// read.
+__attribute__((noinline)) bool sha256File(const std::string& path, std::string& hex, uint32_t& size) {
+  File file = LittleFS.open(path.c_str(), "r");
+  if (!file || file.isDirectory()) return false;
+  br_sha256_context sha;
+  br_sha256_init(&sha);
+  uint8_t buf[256];
+  size = 0;
+  int n;
+  while ((n = file.read(buf, sizeof(buf))) > 0) {
+    br_sha256_update(&sha, buf, static_cast<size_t>(n));
+    size += static_cast<uint32_t>(n);
+  }
+  file.close();
+  if (n < 0) return false;
+  uint8_t digest[br_sha256_SIZE];
+  br_sha256_out(&sha, digest);
+  static const char kHex[] = "0123456789abcdef";
+  hex.clear();
+  hex.reserve(2 * sizeof(digest));
+  for (const uint8_t b : digest) {
+    hex += kHex[b >> 4];
+    hex += kHex[b & 0x0f];
+  }
+  return true;
+}
+#else
 bool folderEmpty(const std::string& dir) {
   DIR* folder = ::opendir(fs::vfsPath(dir).c_str());
   if (!folder) return false;
@@ -80,6 +161,7 @@ __attribute__((noinline)) bool sha256File(const std::string& path, std::string& 
   }
   return true;
 }
+#endif
 
 
 constexpr const char* kAssetUploadTemporary = "/.http-asset.tmp";
@@ -103,6 +185,15 @@ class EspFiles final : public api::Files {
       : Files(installed, iconorigins::storage()), release_(release), changed_(changed) {}
   void list(const std::string& directory, const Visit& visit) override {
     if (directory.empty()) return;
+#if defined(AWTRIX_PLATFORM_RP2040)
+    File folder = LittleFS.open(directory.c_str(), "r");
+    if (!folder || !folder.isDirectory()) return;
+    for (File entry = folder.openNextFile(); entry; entry = folder.openNextFile()) {
+      const bool isDirectory = entry.isDirectory();
+      visit({leafName(entry.name()), isDirectory ? 0u : static_cast<uint64_t>(entry.size()),
+             isDirectory});
+    }
+#else
     if (DIR* folder = ::opendir(fs::vfsPath(directory).c_str())) {
       while (const dirent* entry = ::readdir(folder)) {
         if (!std::strcmp(entry->d_name, ".") || !std::strcmp(entry->d_name, "..")) continue;
@@ -112,8 +203,13 @@ class EspFiles final : public api::Files {
       }
       ::closedir(folder);
     }
+#endif
   }
+#if defined(AWTRIX_PLATFORM_RP2040)
+  bool exists(const std::string& path) override { return isFile(path); }
+#else
   bool exists(const std::string& path) override { return fs::isFile(path); }
+#endif
   bool read(const std::string& path, std::string& content) override {
     media::PodBuffer<uint8_t> bytes;
     if (!media::readAsset(path, bytes)) return false;
@@ -135,6 +231,15 @@ class EspFiles final : public api::Files {
     used = usedBytes; total = totalBytes;
   }
   bool etag(const std::string& path, std::string& value) override {
+#if defined(AWTRIX_PLATFORM_RP2040)
+    File file = LittleFS.open(path.c_str(), "r");
+    if (!file || file.isDirectory()) return false;
+    api::Etag tag;
+    uint8_t buffer[256];
+    int size;
+    while ((size = file.read(buffer, sizeof(buffer))) > 0) tag.append(buffer, size);
+    file.close();
+#else
     const int fd = fs::openRead(path);
     if (fd < 0) return false;
     api::Etag tag;
@@ -142,6 +247,7 @@ class EspFiles final : public api::Files {
     ssize_t size;
     while ((size = ::read(fd, buffer, sizeof(buffer))) > 0) tag.append(buffer, size);
     ::close(fd);
+#endif
     if (size < 0) return false;
     value = tag.value();
     return true;

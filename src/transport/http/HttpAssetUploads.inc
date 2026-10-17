@@ -2,7 +2,11 @@ void HttpApiServer::resetMultipartRequest() {
   // Also runs for an empty POST: a prior request cannot donate its authorization or success.
   cleanupRestore();
   restoreRequest_.reset();
+#if AWTRIX_FEATURE_BROWSER_OTA
   updateRequest_.reset([] { Update.abort(); });
+#else
+  updateRequest_.reset([] {});
+#endif
   uploadWriteOk_ = false;
   uploadContentChecked_ = false;
   updateImageError_.clear();
@@ -121,8 +125,13 @@ void HttpApiServer::handleRestoreUpload() {
       cleanupRestore();
       return;
     }
+#if defined(AWTRIX_PLATFORM_RP2040)
+    // M3b's sink: nested asset folders, and the board keeps its pins, panel and Wi-Fi.
+    restoreSink_.reset(new backup::PicoRestoreSink(*cfg_, &engine_->state(), onConfigChanged_));
+#else
     restoreSink_.reset(
         new LittleFsRestoreSink(*cfg_, &engine_->state(), onConfigChanged_, releaseFiles_));
+#endif
     restoreApplier_.reset(new backup::RestoreApplier(*restoreSink_));
     restoreReader_.reset(new backup::ZipReader(*restoreApplier_));
   } else if (upload.status == UPLOAD_FILE_WRITE) {

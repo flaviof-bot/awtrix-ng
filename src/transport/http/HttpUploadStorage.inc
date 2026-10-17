@@ -1,3 +1,4 @@
+#if AWTRIX_FEATURE_BROWSER_OTA
 // ESP image header: byte 0 is the magic, bytes 12 and 13 hold the chip id, little endian. An app
 // image carries an esp_app_desc_t at offset 32; a usb-*.bin install image starts with the
 // bootloader, which has none - and on the ESP32, whose bootloader sits at 0x1000, with erased
@@ -61,8 +62,10 @@ const char* chipIdName(uint16_t id) {
     default:     return "an unknown chip";
   }
 }
+#endif
 
 
+#if !defined(AWTRIX_PLATFORM_RP2040)
 class LittleFsRestoreSink : public backup::FsRestoreSink {
  public:
   LittleFsRestoreSink(DeviceConfig& live, StateStore* state, std::function<void()> onConfigChanged,
@@ -115,3 +118,4 @@ class LittleFsRestoreSink : public backup::FsRestoreSink {
   File file_;
   std::string curPath_;
 };
+#endif

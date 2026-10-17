@@ -5,6 +5,15 @@
 namespace awtrix {
 namespace sysconfig {
 
+void adoptFixedBoard(DeviceConfig& cfg, const pins::SocProfile& soc) {
+  if (soc.fixedWiring) cfg.setPinSet(soc.defaults);
+  if (!soc.fixedPanelWidth) return;
+  cfg.panelWidth = soc.fixedPanelWidth;
+  cfg.panels = 1;
+  if (cfg.panelHeight != soc.fixedPanelHeights[0] && cfg.panelHeight != soc.fixedPanelHeights[1])
+    cfg.panelHeight = soc.fixedPanelHeights[1];
+}
+
 bool apply(DeviceConfig& cfg, api::JsonReader obj, int& applied, ApplyError& err, Origin origin) {
   applied = 0;
   cfgrules::ConfigError cerr;

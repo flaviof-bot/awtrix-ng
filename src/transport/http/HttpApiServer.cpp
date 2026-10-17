@@ -1,6 +1,11 @@
 #include "transport/http/HttpApiServer.h"
 
 #include <LittleFS.h>
+#if defined(AWTRIX_PLATFORM_RP2040)
+#include <WiFi.h>
+#include <bearssl/bearssl_hash.h>
+#include <lwip/tcp.h>
+#else
 #include <Update.h>
 #include <WiFi.h>
 #include <dirent.h>
@@ -11,6 +16,7 @@
 // CONFIG_SPIRAM_MODE_QUAD out of it, and an absent macro reads as octal - which is the wrong
 // answer to be arriving at by accident.
 #include <sdkconfig.h>
+#endif
 
 #include <algorithm>
 #include <cstring>
@@ -51,8 +57,12 @@
 #include "persistence/IconOriginsStore.h"
 #include "persistence/SystemConfigApply.h"
 #include "persistence/SystemConfigApi.h"
+#if defined(AWTRIX_PLATFORM_RP2040)
+#include "platform/rp2040/PicoRestoreSink.h"
+#else
 #include "persistence/VfsFile.h"
 #include "system/HeapCaps.h"
+#endif
 #include "system/HeapProbe.h"
 #include "transport/http/UpdateImage.h"
 #include "system/Log.h"
@@ -96,10 +106,16 @@ class HttpApiServer::BodyHandler : public RequestHandler {
     return srv_.server_->clientContentLength() > kArenaBodyThresholdBytes ||
            srv_.server_->header("Content-Type").startsWith("application/x-www-form-urlencoded");
   }
-  void raw(WebServer& server, String uri, HTTPRaw& raw) override {
+#if defined(AWTRIX_PLATFORM_RP2040)
+  // Pico's parser invokes the newer overloads; the base implementations do
+  // not forward to the legacy hooks, even though those remain in the API.
+  bool canHandle(HttpServerBase&, HTTPMethod m, String uri) override { return canHandle(m, uri); }
+  bool canRaw(HttpServerBase&, String uri) override { return canRaw(uri); }
+#endif
+  void raw(HttpServerBase& server, String uri, HTTPRaw& raw) override {
     srv_.collectBody(server, uri, raw);
   }
-  bool handle(WebServer&, HTTPMethod, String) override {
+  bool handle(HttpServerBase&, HTTPMethod, String) override {
     srv_.dispatch();
     return true;
   }
@@ -123,19 +139,24 @@ class HttpApiServer::UploadHandler : public RequestHandler {
     return api::isUploadRoute(uri.c_str());
   }
   bool canRaw(String) override { return true; }
-  void raw(WebServer& server, String, HTTPRaw& raw) override {
+#if defined(AWTRIX_PLATFORM_RP2040)
+  bool canHandle(HttpServerBase&, HTTPMethod m, String uri) override { return canHandle(m, uri); }
+  bool canUpload(HttpServerBase&, String uri) override { return canUpload(uri); }
+  bool canRaw(HttpServerBase&, String uri) override { return canRaw(uri); }
+#endif
+  void raw(HttpServerBase& server, String, HTTPRaw& raw) override {
     // These routes require multipart files; other bodies are discarded in WebServer's raw buffer.
     if (raw.status == RAW_START)
       static_cast<RawWebServer&>(server).setRawReadTimeout(kRawBodyIdleTimeoutMs);
     else if (raw.status == RAW_END || raw.status == RAW_ABORTED)
       static_cast<RawWebServer&>(server).setRawReadTimeout(kClientIdleTimeoutMs);
   }
-  void upload(WebServer&, String uri, HTTPUpload&) override {
+  void upload(HttpServerBase&, String uri, HTTPUpload&) override {
     if (uri == "/update") srv_.handleUpdateUpload();
     else if (uri == "/api/v1/restore") srv_.handleRestoreUpload();
     else srv_.handleFileUpload();
   }
-  bool handle(WebServer&, HTTPMethod, String uri) override {
+  bool handle(HttpServerBase&, HTTPMethod, String uri) override {
     if (uri == "/update") srv_.handleUpdateDone();
     else if (uri == "/api/v1/restore") srv_.handleRestoreDone();
     else srv_.handleFileUploadDone();
@@ -164,7 +185,12 @@ void HttpApiServer::begin(uint16_t port, CoreEngine& engine, IBoard& board, Canv
   server_ = new RawWebServer(port);
   const char* kCollectHeaders[] = {"If-None-Match", "Content-Type",
       api::kMethodOverrideHeader, "Host", "Origin", "Sec-Fetch-Site"};
+#if defined(AWTRIX_PLATFORM_RP2040)
+  // A plain array would pick arduino-pico's variadic overload, which takes each argument as a name.
+  server_->collectHeaders(static_cast<const char**>(kCollectHeaders), std::size_t{6});
+#else
   server_->collectHeaders(kCollectHeaders, 6);
+#endif
   // Select/reset each multipart request before parsing its body, including empty requests.
   server_->addHandler(new UploadHandler(*this));
   server_->addHandler(new BodyHandler(*this));
@@ -172,6 +198,13 @@ void HttpApiServer::begin(uint16_t port, CoreEngine& engine, IBoard& board, Canv
   if (!bodyArena_.init(kMaxBodyBytes))
     logf("http: body arena allocation failed; body-carrying requests will be refused");
   server_->begin();
+#if defined(AWTRIX_PLATFORM_RP2040)
+  if (tcp_pcb* listener = ListenPcb::of(server_->getServer())) {
+    tcp_setprio(listener, TCP_PRIO_MIN);
+    serverAccept = reinterpret_cast<tcp_pcb_listen*>(listener)->accept;
+    tcp_accept(listener, acceptConnected);
+  }
+#endif
 }
 
 #include "transport/http/HttpAssetUploads.inc"
@@ -182,7 +215,7 @@ void HttpApiServer::dropRawBody() {
 
 // Called by WebServer for every raw-body chunk. Script sources use a second arena that is
 // allocated at RAW_START and released again on completion, since it dwarfs the fixed body arena.
-void HttpApiServer::collectBody(WebServer& server, const String& uri, HTTPRaw& raw) {
+void HttpApiServer::collectBody(HttpServerBase& server, const String& uri, HTTPRaw& raw) {
   const std::string method = methodName(server.method());
   const std::string path = uri.c_str();
   const bool rawSource = api::isRawBodyWrite(method, path);

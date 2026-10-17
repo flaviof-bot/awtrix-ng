@@ -2,6 +2,13 @@
 
 #include <FS.h>
 #include <WebServer.h>
+#if defined(AWTRIX_PLATFORM_RP2040)
+#include "platform/rp2040/WifiCompat.h"
+// arduino-pico's request hooks take the HTTPServer base of its WebServer template.
+using HttpServerBase = HTTPServer;
+#else
+using HttpServerBase = WebServer;
+#endif
 
 #include <cstdint>
 #include <functional>
@@ -87,7 +94,7 @@ class HttpApiServer {
   api::scriptsounds::InstalledScripts installedScripts() const;
 
   bool authOk();
-  void collectBody(WebServer& server, const String& uri, HTTPRaw& raw);
+  void collectBody(HttpServerBase& server, const String& uri, HTTPRaw& raw);
   void dropRawBody();
   void handleUpdateUpload();
   void scanImageMarker(const uint8_t* buf, size_t len);
@@ -155,6 +162,9 @@ class HttpApiServer {
   // A started Wi-Fi scan counts as running for this long, whatever scanComplete() reports.
   static constexpr uint32_t kWifiScanMs = 15000;
   uint32_t wifiScanStartedMs_ = 0;
+#if defined(AWTRIX_PLATFORM_RP2040)
+  platform::pico::WifiScan wifiScan_;
+#endif
   bool apMode_ = false;
 };
 

@@ -5,6 +5,7 @@
 
 #include "AppConfig.h"
 #include "core/ApplicationRuntime.h"
+#include "core/DeviceCapabilities.h"
 #include "core/FrameClock.h"
 #include "core/PlatformDescriptor.h"
 #include "core/ScreenDisplay.h"
@@ -13,6 +14,7 @@
 #include "core/apps/DefaultApps.h"
 #include "core/effects/EffectNoise.h"
 #include "core/render/BootScreen.h"
+#include "core/render/PaletteStore.h"
 #include "core/render/ProvisioningScreen.h"
 #include "core/render/TextRenderer.h"
 #include "hal/BoardRegistry.h"
@@ -23,6 +25,7 @@
 #include "persistence/AppOrderStore.h"
 #include "persistence/Filesystem.h"
 #include "persistence/NvsSettings.h"
+#include "persistence/SystemConfigApply.h"
 #include "platform/BuildFeatures.h"
 #include "platform/rp2040/PaletteFiles.h"
 #include "platform/rp2040/PicoSleep.h"
@@ -34,6 +37,7 @@
 #include "system/GalacticUnicornControls.h"
 #include "transport/net/ArtnetService.h"
 #include "transport/net/DiscoveryService.h"
+#include "transport/http/HttpApiServer.h"
 #include "transport/net/NetworkService.h"
 
 #include <LittleFS.h>
@@ -118,7 +122,8 @@ SettingsSaver g_settingsSaver{-100000};
 std::unique_ptr<DefaultApps> g_builtinApps;
 std::unique_ptr<ApplicationRuntime> g_runtime;
 NetworkService g_net;
-std::string g_capabilities; // M4b: served by the HTTP API, M5b: published over MQTT.
+HttpApiServer g_http;
+std::string g_capabilities; // Served by the HTTP API; M5b: published over MQTT.
 
 // Holding B (select) for one second at boot forces the provisioning AP without erasing the stored
 // credentials, as on the ESP32. The runtime hold of B (the launcher) only starts in loop().
@@ -152,6 +157,14 @@ PlatformDescriptor platformDescriptor() {
   return platform;
 }
 
+// As on the ESP32: at boot and after every settings change.
+void refreshCapabilities() {
+  const PlatformDescriptor platform = platformDescriptor();
+  g_capabilities = g_runtime->capabilitiesJson(platform);
+  g_http.setCapabilitiesJson(std::make_shared<const std::string>(g_capabilities));
+  g_http.setDeviceCapabilities(DeviceCapabilities::from(g_audio.caps(), &platform));
+}
+
 void paceFrame() {
   static int64_t nextMs = 0;
   const int64_t now = monotonicMs();
@@ -181,6 +194,8 @@ void setup() {
     Serial.println("warning: Galactic Unicorn panelHeight must be 8 or 11; using 11");
     g_cfg.panelHeight = 11;
   }
+  // A pin map or panel size stored by another build would make every PUT /api/v1/system fail.
+  sysconfig::adoptFixedBoard(g_cfg);
   logbuf::setVerbose(g_cfg.debugMode);
   g_board = &activeBoard(g_cfg);
   g_audio.setTone(g_board->toneSink());
@@ -208,7 +223,6 @@ void setup() {
   g_runtime->engine().state().runtime().tempDecimals = g_cfg.tempDecimals;
   g_runtime->bindOutputs(*g_board, g_settingsDirty);
   g_runtime->engine().state().emit(StateEvent::SettingsChanged);
-  g_capabilities = g_runtime->capabilitiesJson(platformDescriptor());
   Serial.printf("boot: AWTRIX NG %s on %s (%dx%d); PIO/DMA panel\n",
                 AWTRIX_NG_VERSION, g_board->name(), g_board->matrixWidth(),
                 g_board->matrixHeight());
@@ -226,6 +240,28 @@ void setup() {
   g_net.begin(g_cfg, g_runtime->engine().state().runtime().wifi, forceAp, showBootLogo);
   g_time.apply(g_cfg.tz, g_cfg.ntpServer, true);
   g_netWasConnected = g_net.isConnected();
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  mac.toLowerCase();
+  const uint16_t webPort =
+      g_net.apMode() ? 80 : (g_cfg.webPort > 0 ? static_cast<uint16_t>(g_cfg.webPort) : 80);
+  // In AP mode the server admits only the provisioning routes (core/ProvisioningPolicy.h).
+  g_http.begin(webPort, g_runtime->engine(), *g_board, g_runtime->canvas(), mac.c_str(), g_cfg,
+               g_net.apMode());
+  g_http.setOnConfigChanged([] {
+    // The panel size is fixed, so only mirror and rotate reach the board, and they apply live.
+    const MatrixLayout layout = g_cfg.matrixLayout();
+    if (layout.width() == g_board->matrixWidth() && layout.height() == g_board->matrixHeight())
+      g_board->setMatrixLayout(layout);
+    refreshCapabilities();
+    g_runtime->engine().state().runtime().tempDecimals = g_cfg.tempDecimals;
+    logbuf::setVerbose(g_cfg.debugMode);
+  });
+  g_http.setOnAssetsChanged([] {
+    g_runtime->invalidateIcons();
+    render::clearPaletteCache();
+  });
+  refreshCapabilities();
 #if AWTRIX_PICO_UDP
   if (g_netWasConnected) {
     g_disco.begin(g_net.hostname(), g_cfg.webPort);
@@ -242,6 +278,7 @@ void loop() {
   g_controls.sampleLight(g_runtime->engine(), unicorn.readLdrRaw(), now);
   g_runtime->beginFrame(now);
   g_net.tick(static_cast<uint32_t>(now));
+  g_http.tick();
   const bool netConnected = g_net.isConnected();
   // A changed tz or ntpServer restarts SNTP; so does the link coming back, as on the ESP32.
   g_time.apply(g_cfg.tz, g_cfg.ntpServer, netConnected && !g_netWasConnected);
