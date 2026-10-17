@@ -233,9 +233,11 @@ void RenderPipeline::renderPage(Canvas& dst, const std::string& id, int64_t nowM
     r.iconGap = column - r.iconWidth;
     r.textClipLeft = column ? column + iconShift(spec, *slot) : 0;
     const FontEntry& font = fontFor(&spec);
-    // Without a page zoom, page text sits in the eight-row content band, on the same rows as the
-    // icon and the built-in apps. With one (TC002) the line box stays centred on the canvas.
-    const bool band = !d_.zoom || !d_.zoom->available();
+    // Without a page zoom, eight-row page text sits in the content band, on the same rows as the
+    // icon and the built-in apps. With one (TC002), and for fonts taller than the band, the line box
+    // stays centred on the canvas.
+    const bool band = (!d_.zoom || !d_.zoom->available()) &&
+                      font.ascent + font.descent <= render::kContentBandHeight;
     r.textBand = band;
     r.baseline = band ? pageBaseline(font) : pageBaseline(font, page.height());
     r.drawBaseline = pageBaseline(font);
