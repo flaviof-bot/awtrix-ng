@@ -190,8 +190,8 @@ class EspFiles final : public api::Files {
     if (!folder || !folder.isDirectory()) return;
     for (File entry = folder.openNextFile(); entry; entry = folder.openNextFile()) {
       const bool isDirectory = entry.isDirectory();
-      visit({leafName(entry.name()), isDirectory ? 0u : static_cast<uint64_t>(entry.size()),
-             isDirectory});
+      const std::string name = leafName(entry.name());
+      visit({name.c_str(), isDirectory ? 0u : static_cast<uint64_t>(entry.size()), isDirectory});
     }
 #else
     if (DIR* folder = ::opendir(fs::vfsPath(directory).c_str())) {
