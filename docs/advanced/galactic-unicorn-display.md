@@ -278,7 +278,7 @@ returns to apps five seconds after the last frame. Universes start at zero and
 hold 170 RGB pixels each, continuing across the 53x11 canvas. Discovery
 advertises the shared HTTP server's web port.
 
-Hardware status: verified on PR 1 (1.2.1 base); see the guide's
+Hardware status: verified on the Pico 2 W with this build (the Pico W on PR 1, 1.2.1 base); see the guide's
 [verification scope](galactic-unicorn.md#verification-scope). To check a build again: flash the UF2, check the SSID/AP MODE behavior above,
 capture display and CYW43 PIO/SM logs plus `refresh advancing`, then check the
 animated boot screen during a stored-credential join. Host tests and firmware

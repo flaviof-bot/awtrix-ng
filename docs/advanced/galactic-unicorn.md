@@ -10,12 +10,12 @@ the Pico fitted to your board:
 
 | Hardware | PlatformIO environment | USB image | Hardware status |
 | --- | --- | --- | --- |
-| Pico W, RP2040, 264 KB SRAM, 2 MB flash | `galactic_unicorn` | `firmware-galactic-unicorn.uf2` | verified on PR 1 (1.2.1 base) |
-| Pico 2 W, RP2350, 520 KB SRAM, 4 MB flash | `galactic_unicorn_2w` | `firmware-galactic-unicorn-2w.uf2` | verified on PR 1 (1.2.1 base) |
+| Pico W, RP2040, 264 KB SRAM, 2 MB flash | `galactic_unicorn` | `firmware-galactic-unicorn.uf2` | build, CI and fit on 1.2.2; on the board only on PR 1 (1.2.1 base) |
+| Pico 2 W, RP2350, 520 KB SRAM, 4 MB flash | `galactic_unicorn_2w` | `firmware-galactic-unicorn-2w.uf2` | verified on the board on 1.2.2 |
 
-The hardware results on this page come from the earlier port of AWTRIX NG 1.2.1 to the board
-(PR 1). This build carries the same features on AWTRIX NG 1.2.2; its own hardware results replace
-the PR 1 notes once the board has been checked again.
+The Pico 2 W image of this build was checked on a Galactic Unicorn; the Pico W image was only
+built, checked in CI and checked to fit. See [Verification scope](#verification-scope) for what
+was checked and for the known limits.
 
 Both images reserve **512 KiB for LittleFS**, separate from the firmware. Neither Pico has
 PSRAM. There is no battery, and no I²C sensor is read (the Qw/ST connector is unused), so
@@ -127,7 +127,10 @@ budget depends on the chip:
 | Largest script that installed (PR 1, 1.2.1 base) | about 7 KB of source | about 28 KB of source |
 
 The last two rows were measured on PR 1 (1.2.1 base); 1.2.2's script engine is larger, so read
-`freeHeapBytes` and `scriptHeapBudgetBytes` on your own board. On the Pico 2 W a larger script
+`freeHeapBytes` and `scriptHeapBudgetBytes` on your own board. On a Pico 2 W with this build,
+`freeHeapBytes` / `largestFreeBlockBytes` read 351428 / 342280 bytes before the scripting guide's
+Hello script was installed, 351140 / 336960 with it running, and 347316 / 331184 with a script
+that animates three script icons, still at 42 fps. On the Pico 2 W a larger script
 fails with `out of memory` while plenty of memory is still free: the 96 KB budget is the limit
 there, not the memory Wi-Fi needs.
 
@@ -183,20 +186,61 @@ their own size. See [Limits](../reference/limits.md#tall-displays-content-band-a
 
 ## Verification scope
 
-These results are from PR 1 (1.2.1 base); this build has not been checked on the board again yet.
+Verified on the board with this build (AWTRIX NG 1.2.2), **Pico 2 W**:
 
-Verified on PR 1 (1.2.1 base), **Pico W**: display, light sensor and frame rate, the HTTP smoke
-test (`tools/pico/smoke.sh`, no failures), 80 requests at once, watchdog recovery, MQTT and Home
+- the HTTP smoke test (`tools/pico/smoke.sh`): 109 passed, 0 failed; 80 of 80 requests at once
+  answered;
+- the display at 42 fps with the BrickBreaker, Snake and PingPong games, notifications, the clock
+  with NTP time in the configured time zone, and the light sensor with automatic brightness on
+  and off;
+- `mirror` and `rotate`, and `422 validationFailed` for height 14, width 64 and a wiring change;
+- height 8 shown in rows 1–8 with the rows below dark, against height 11 (a photo of a solid fill
+  agrees; the host test counts the rows);
+- watchdog recovery: a hung firmware restarted and reported `resetReason: "watchdog"`;
+- slow and large requests without a restart: a header split over several packets and 1900 bytes
+  of headers are answered, 2100 bytes of headers get `431` at once, a client sending one byte
+  every two seconds is cut off, and the 80 KB web UI downloads to a slow reader;
+- timed sleep: the display goes dark and the board answers again after the wake;
+- the scripting guide's Hello script, and three animated script icons in one script, with the
+  memory figures above;
+- an image built with `-D AWTRIX_FEATURE_SCRIPTING=0`: `scripting` false, the script routes
+  answer `503`, the smoke test passes 107 checks with 0 failures, and 80 of 80 requests at once
+  answer;
+- a backup restore with icons in nested folders, byte for byte;
+- settings, Wi-Fi and a stored script kept across three UF2 updates;
+- Wi-Fi setup from a phone through the setup network;
+- the keys: brightness + and −, A and C step apps, holding B opens the launcher, D does nothing,
+  Sleep switches the display off and on again;
+- melodies at each volume step, heard at the board, with the volume keys changing the volume;
+- the A+C rescue at power-on: `scriptingEnabled` false and the log line
+  `boot: LEFT+RIGHT held, scripting disabled`;
+- MQTT on a Home Assistant broker: discovery publishes one device with 25 entities, and a
+  notification sent over MQTT is shown.
+
+The **Pico W** image of this build was built, checked in CI and checked to fit, but not tested on
+a board. PR 1 (1.2.1 base) verified the Pico W on the board: display, light sensor and frame rate,
+the HTTP smoke test with no failures, 80 requests at once, watchdog recovery, MQTT and Home
 Assistant discovery (21 entities), Matrix light control, notifications, A/B/C events, brightness,
-volume, Sleep, and hearing the `alert` melody. The button webhook was tested only on the host.
+volume, Sleep, and hearing the `alert` melody.
 
-Verified on PR 1 (1.2.1 base), **Pico 2 W**: display at 42 fps, `mirror` and `rotate`,
-notifications, light sensor, Wi-Fi join, mDNS and NTP, the HTTP smoke test (every API check
-passes; the 80-request burst depends on the Wi-Fi link), watchdog recovery
-(`resetReason: "watchdog"`), settings kept across firmware UF2 updates, the scripting figures
-above, MQTT with Home Assistant discovery (21 entities, Matrix light control, notifications),
-A/B/C events, brightness, volume, Sleep, inline and saved melodies, the A+C `NOSCR` rescue, and
-Wi-Fi setup from a phone through the setup network.
+The button webhook was tested only on the host.
+
+### Known limits
+
+- A request body over 2 KB sent slower than about 180 bytes per second can still hold the board
+  past the watchdog (fork issue #5; see [Limits](../reference/limits.md#galactic-unicorn)). One
+  such upload, at about 170 bytes per second, completed on the bench without a restart; that
+  does not remove the limit.
+- Opening the board by its `.local` name was not checked on the bench: no mDNS reply was seen
+  on that network. Use the address from your router if the name does not resolve.
+- An upload into a folder that does not exist yet below an asset folder, such as
+  `/ICONS/sub/icon.gif`, answers `507 insufficientStorage`. A backup restore creates every folder
+  level it needs.
+- A request that announces a body and never sends it is closed without an answer, not with the
+  `503` the image without scripting gives a complete request.
+- Script `http.*` requests and Modbus reads are not available and return `false` (fork issue #6).
+- How long the board waits for a client that stops reading, and the full start-up log in
+  `/api/v1/logs`, were not established on the bench.
 
 The [display driver](galactic-unicorn-display.md) and [storage](pico-persistence.md) pages
 describe how the board's firmware works inside.
