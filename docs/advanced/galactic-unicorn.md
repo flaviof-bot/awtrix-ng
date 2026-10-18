@@ -209,6 +209,7 @@ Verified on the board with this build (AWTRIX NG 1.2.2), **Pico 2 W**:
 - a backup restore with icons in nested folders, byte for byte;
 - settings, Wi-Fi and a stored script kept across three UF2 updates;
 - Wi-Fi setup from a phone through the setup network;
+- the web UI in a browser on a phone and on a laptop, clicking through its tabs;
 - the keys: brightness + and −, A and C step apps, holding B opens the launcher, D does nothing,
   Sleep switches the display off and on again;
 - melodies at each volume step, heard at the board, with the volume keys changing the volume;
@@ -233,9 +234,10 @@ The button webhook was tested only on the host.
   does not remove the limit.
 - Opening the board by its `.local` name was not checked on the bench: no mDNS reply was seen
   on that network. Use the address from your router if the name does not resolve.
-- An upload into a folder that does not exist yet below an asset folder, such as
-  `/ICONS/sub/icon.gif`, answers `507 insufficientStorage`. A backup restore creates every folder
-  level it needs.
+- An upload creates one missing folder level, the file's own folder: the folder above that must
+  already exist. `/ICONS/sub/icon.gif` is saved when `/ICONS` exists; `/ICONS/n1/n2/icon.gif`
+  with neither `n1` nor `n2` present answers `507 insufficientStorage`. A backup restore creates
+  every folder level it needs.
 - A request that announces a body and never sends it is closed without an answer, not with the
   `503` the image without scripting gives a complete request.
 - Script `http.*` requests and Modbus reads are not available and return `false` (fork issue #6).

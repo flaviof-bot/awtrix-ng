@@ -3366,9 +3366,9 @@ Where the file goes:
 * a file for `/MP3` must be named the way you play it: 1–32 characters of `A-Za-z0-9_-` plus
   `.mp3`,
 * an MP3 in `/MP3` and a melody in `/MELODIES` never share a name,
-* a missing folder is created.<!-- only rp2040 --> On this board an upload into a subfolder of an asset
-  folder that does not exist yet, such as `/ICONS/sub/icon.gif`, answers `507`; a backup restore
-  creates every folder level.<!-- /only -->
+* a missing folder is created.<!-- only rp2040 --> On this board an upload creates only the file's own
+  folder, so the folder above it must exist: `/ICONS/n1/n2/icon.gif` with neither `n1` nor `n2`
+  present answers `507`. A backup restore creates every folder level.<!-- /only -->
 
 The content must fit the folder: `/ICONS` takes GIF or JPEG (not PNG), `/MELODIES` RTTTL text,
 `/PALETTES` one `RRGGBB` color per line, `/MP3` MP3 files. Empty files are refused.
